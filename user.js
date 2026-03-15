@@ -16,7 +16,8 @@ const CRITERIOS_DEFAULT = [
 ];
 
 const getCriterios = () => D?.criterios?.length ? D.criterios : CRITERIOS_DEFAULT;
-const getMaxScore  = () => getCriterios().length * 4;
+const getMaxScore  = () => getCriterios().length * 4; // 28 pts base
+const MAX_TOTAL    = () => getMaxScore() + 2;         // 30 pts con bono
 
 /* ── BOOT ── */
 document.addEventListener('DOMContentLoaded', async () => {
@@ -93,7 +94,7 @@ function renderScores(pe) {
     setEl('hero-nivel', '—');
     const el = document.getElementById('hero-score'); if (el) el.style.color = 'var(--muted)';
   }
-  setEl('hero-max', MAX);
+  setEl('hero-max', MAX_TOTAL());
 
   if (!myScore) {
     container.innerHTML = `
@@ -105,6 +106,8 @@ function renderScores(pe) {
   }
 
   const total = calcScore(myScore);
+  const base  = total - (myScore.ext||0);
+  const ext   = myScore.ext || 0;
   const bars  = criterios.map((c, i) => {
     const val    = myScore[c.key] ?? 0;
     const critFb = myFb?.[c.key] || '';
@@ -130,12 +133,13 @@ function renderScores(pe) {
         <div class="sse-label">Puntaje total — ${pe}</div>
         <div class="sse-name">${CU.name || CU.user}</div>
         ${myScore.area ? `<div class="sse-role">Área: ${myScore.area}</div>` : ''}
+        ${ext > 0 ? `<div style="margin-top:8px"><span class="bono-badge"><span class="bono-icon">⭐</span>Bono de excelencia +${ext}</span></div>` : ''}
       </div>
       <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
         <span class="nivel-badge ${scoreClass(total)}">${scoreLabel(total)}</span>
         <div style="text-align:right">
           <div style="font-family:'Bebas Neue',sans-serif;font-size:2rem;color:${scoreColor(total)};line-height:1">${total}</div>
-          <div style="font-size:.65rem;color:var(--muted)">/ ${MAX} pts</div>
+          <div style="font-size:.65rem;color:var(--muted)">/ ${MAX_TOTAL()} pts</div>
         </div>
       </div>
     </div>
@@ -205,9 +209,9 @@ async function handleRefresh() {
 }
 
 /* ── HELPERS ── */
-const calcScore  = row => getCriterios().reduce((s,c)=>s+(row[c.key]||0),0);
-const scoreColor = s => s>=24?'var(--sex)':s>=18?'var(--sbu)':s>=10?'var(--spr)':'var(--sba)';
-const scoreLabel = s => s>=24?'Excelente':s>=18?'Bueno':s>=10?'En Proceso':'Bajo';
+const calcScore  = row => getCriterios().reduce((s,c)=>s+(row[c.key]||0),0) + (row.ext||0);
+const scoreColor = s => s>=26?'var(--sex)':s>=20?'var(--sbu)':s>=11?'var(--spr)':'var(--sba)';
+const scoreLabel = s => s>=26?'Excelente':s>=20?'Bueno':s>=11?'En Proceso':'Bajo';
 const scoreClass = s => s>=24?'sex':s>=18?'sbu':s>=10?'spr':'sba';
 const initials   = n => n.split(' ').map(w=>w[0]).slice(0,2).join('').toUpperCase();
 const setEl      = (id,txt) => { const el=document.getElementById(id); if(el) el.textContent=txt; };

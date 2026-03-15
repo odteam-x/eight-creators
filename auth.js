@@ -15,8 +15,14 @@ const Auth = (() => {
 
     requireRole(role) {
       const user = this.getSession();
-      if (!user)             { window.location.replace('index.html'); return null; }
-      if (user.rol !== role) { window.location.replace(user.rol === 'admin' ? 'admin.html' : 'user.html'); return null; }
+      if (!user) { window.location.replace('index.html'); return null; }
+      if (user.rol !== role) {
+        const dest = user.rol === 'admin' ? 'admin.html'
+                   : user.rol === 'secretario' ? 'secretario.html'
+                   : 'user.html';
+        window.location.replace(dest);
+        return null;
+      }
       return user;
     },
   };

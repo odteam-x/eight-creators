@@ -61,7 +61,7 @@ img { display:block; max-width:100%; }
 .topbar { position:sticky; top:0; z-index:100; height:var(--topbar-h); display:flex; align-items:center; gap:16px; padding:0 20px; background:rgba(8,10,15,.85); backdrop-filter:blur(20px); border-bottom:1px solid var(--border); transition:border-color .3s, box-shadow .3s; }
 .topbar.scrolled { border-color:var(--border-glow); box-shadow:0 4px 30px rgba(0,0,0,.5); }
 .tb-brand { display:flex; align-items:center; gap:10px; flex-shrink:0; }
-.tb-logo  { width:28px; height:28px; object-fit:contain; border-radius:4px; }
+.tb-logo  { width: 38px; height: 38px; object-fit: contain; border-radius: 6px; }
 .tb-title { font-family:'Bebas Neue',sans-serif; font-size:1.3rem; letter-spacing:2px; }
 .tb-title em { color:var(--red); font-style:normal; }
 .admin-badge { background:linear-gradient(135deg,var(--gold),#c8960a); color:#000; font-family:'Barlow Condensed',sans-serif; font-size:.55rem; font-weight:900; letter-spacing:2px; text-transform:uppercase; padding:3px 8px; border-radius:4px; }
@@ -224,5 +224,26 @@ img { display:block; max-width:100%; }
 .cst.sp  { color:var(--blue);  background:rgba(91,127,255,.1);  border:1px solid rgba(91,127,255,.2); }
 .cst.spe { color:var(--muted); background:var(--glass);         border:1px solid var(--faint); }
 .sdot { width:6px; height:6px; border-radius:50%; background:currentColor; animation:pulseDot 1.8s ease-in-out infinite; }
+
+/* ── BONO EXCELENCIA BADGE ── */
+.bono-badge {
+  display:inline-flex; align-items:center; gap:5px;
+  padding:4px 12px; border-radius:20px;
+  font-family:'Barlow Condensed',sans-serif;
+  font-size:.65rem; font-weight:700; letter-spacing:2px; text-transform:uppercase;
+  background:rgba(240,192,64,.12); color:var(--gold);
+  border:1px solid rgba(240,192,64,.3);
+}
+.bono-badge .bono-icon { font-size:.85rem; }
+
+/* ── SECRETARIO BADGE ── */
+.secretario-badge {
+  background:linear-gradient(135deg,#5B7FFF,#2D3478);
+  color:#fff;
+  font-family:'Barlow Condensed',sans-serif;
+  font-size:.55rem; font-weight:900;
+  letter-spacing:2px; text-transform:uppercase;
+  padding:3px 8px; border-radius:4px;
+}
 
 @media (max-width:600px) { .cal-grid{grid-template-columns:1fr} }

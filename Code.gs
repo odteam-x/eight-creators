@@ -21,11 +21,44 @@
 const SS_ID     = '1ZDj4OvA1lkdUKTU-hU24CY34CKekZKb_i0oGlcWNCdo'; // ← REEMPLAZAR
 const API_TOKEN = 'sti2026';        // ← CAMBIAR A ALGO SECRETO
 
+// ─────────────────────────────────────────────────────────────
+//  CLAVES DE DISTRITO
+//  ─────────────────────────────────────────────────────────────
+//  Configura aquí los distritos y sus claves secretas.
+//  Formato: 'CLAVE_SECRETA': 'Nombre exacto del distrito en el Sheet'
+//
+//  El "Nombre exacto" debe coincidir con lo que está escrito
+//  en la columna C (Distrito) de las hojas CREATORS SCORE.
+//
+//  Luego en la hoja USUARIOS, columna E, pon la clave del
+//  secretario que corresponde a ese distrito.
+//
+//  Ejemplo:
+//    Si en CREATORS SCORE - PE1, columna C dice "Santiago 08-06",
+//    entonces pon: 'CLAVE_08_06': 'Santiago 08-06'
+// ─────────────────────────────────────────────────────────────
+const DISTRICT_KEYS = {
+  '_01': '08-01',
+  '_02': '08-02',
+  '_03': '08-03',
+  '_04': '08-04',
+  '_05': '08-05',
+  '_06': '08-06',
+  '_07': '08-07',
+  '_08': '08-08',
+  '_09': '08-09',
+  '10': '08-10',
+};
+
 // Columnas de datos (0-based, desde el inicio de la fila)
 // Estructura real del Sheet: A=usuario, B=rol, C=distrito, D=nombre, E=area
 // F=pla, G=rev, H=edi, I=dis, J=flu, K=nar, L=eje, M=ext
 const COL = { pla:5, rev:6, edi:7, dis:8, flu:9, nar:10, eje:11, ext:12 };
 const COL_1B = { pla:6, rev:7, edi:8, dis:9, flu:10, nar:11, eje:12, ext:13 }; // 1-based para setRange
+
+// Columna E de USUARIOS (índice 4) = clave de distrito (solo para secretarios)
+// Ejemplo: 'CLAVE_08_06'
+const COL_USUARIO_DISTRICT_KEY = 4; // 0-based
 
 // Los datos reales empiezan en la fila 4 (filas 1-3 son encabezados)
 const DATA_START_IDX = 3; // 0-based
@@ -96,9 +129,10 @@ function jsonOut(data) {
 function getData() {
   const ss = SpreadsheetApp.openById(SS_ID);
   return {
-    ok:         true,
-    users:      getUsers(ss),
-    criterios:  getCriteriosFromSheet(ss),
+    ok:           true,
+    users:        getUsers(ss),
+    districtKeys: DISTRICT_KEYS,   // mapa clave → nombre, para el frontend
+    criterios:    getCriteriosFromSheet(ss),
     scores:     {
       PE1: getScores(ss, 'PE1'),
       PE2: getScores(ss, 'PE2'),
@@ -120,14 +154,21 @@ function getUsers(ss) {
   if (!sheet) return [];
   const rows = sheet.getDataRange().getValues();
   return rows
-    .slice(1) // omitir encabezado si existe
+    .slice(1)
     .filter(r => r[0])
-    .map(r => ({
-      user: String(r[0]).trim(),
-      pass: String(r[1]).trim(),
-      name: String(r[2] || '').trim(),
-      rol:  String(r[3] || 'miembro').toLowerCase().trim(),
-    }));
+    .map(r => {
+      const rol         = String(r[3] || 'miembro').toLowerCase().trim();
+      const districtKey = String(r[4] || '').trim();
+      const distrito    = districtKey ? (DISTRICT_KEYS[districtKey] || districtKey) : '';
+      return {
+        user:        String(r[0]).trim(),
+        pass:        String(r[1]).trim(),
+        name:        String(r[2] || '').trim(),
+        rol,
+        districtKey,
+        distrito,
+      };
+    });
 }
 
 function getCriteriosFromSheet(ss) {
@@ -164,8 +205,7 @@ function getScores(ss, pe) {
       flu:     toNum(r[COL.flu]),
       nar:     toNum(r[COL.nar]),
       eje:     toNum(r[COL.eje]),
-      ext:     toNum(r[COL.ext]),
-    }));
+      ext:     toNum(r[COL.ext]),    }));
 }
 
 function getFeedback(ss, pe) {
@@ -245,11 +285,16 @@ function updateScore(pe, usuario, criterio, valor) {
   const sheet = ss.getSheetByName(`CREATORS SCORE - ${pe}`);
   if (!sheet) return { ok: false, error: `Hoja no encontrada: CREATORS SCORE - ${pe}` };
 
+  // Validar rango según criterio
+  const maxVal = criterio === 'ext' ? 2 : 4;
+  const numVal = parseFloat(valor) || 0;
+  if (numVal < 0 || numVal > maxVal) return { ok: false, error: `Valor ${numVal} fuera de rango (0-${maxVal})` };
+
   const rows = sheet.getDataRange().getValues();
   for (let i = DATA_START_IDX; i < rows.length; i++) {
     if (String(rows[i][0]).trim() === String(usuario).trim()) {
-      sheet.getRange(i + 1, colIdx).setValue(parseFloat(valor) || 0);
-      return { ok: true, pe, usuario, criterio, valor };
+      sheet.getRange(i + 1, colIdx).setValue(numVal);
+      return { ok: true, pe, usuario, criterio, valor: numVal };
     }
   }
   return { ok: false, error: `Usuario no encontrado: ${usuario}` };

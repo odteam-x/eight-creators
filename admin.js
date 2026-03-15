@@ -18,6 +18,7 @@ const CRITERIOS_DEFAULT = [
 
 const getCriterios = () => D?.criterios?.length ? D.criterios : CRITERIOS_DEFAULT;
 const getMaxScore  = () => getCriterios().length * 4;
+const MAX_TOTAL    = () => getMaxScore() + 2;
 
 /* ── BOOT ── */
 document.addEventListener('DOMContentLoaded', async () => {
@@ -54,11 +55,11 @@ function renderAll() {
 /* ── OVERVIEW ── */
 function renderOverview(rows) {
   setEl('ov-pe', aPE);
-  const MAX=getMaxScore(), scores=rows.map(calcScore), total=rows.length;
+  const MAX=MAX_TOTAL(), scores=rows.map(calcScore), total=rows.length;
   const avg=total?(scores.reduce((a,b)=>a+b,0)/total).toFixed(1):'—';
   const maxS=total?Math.max(...scores):'—', topR=rows.find(r=>calcScore(r)===Math.max(...scores));
-  const exc=scores.filter(s=>s>=24).length, bue=scores.filter(s=>s>=18&&s<24).length;
-  const enP=scores.filter(s=>s>=10&&s<18).length, baj=scores.filter(s=>s<10).length;
+  const exc=scores.filter(s=>s>=26).length, bue=scores.filter(s=>s>=20&&s<26).length;
+  const enP=scores.filter(s=>s>=11&&s<20).length, baj=scores.filter(s=>s<11).length;
 
   const statsEl=document.getElementById('ov-stats');
   if (statsEl) statsEl.innerHTML=[
@@ -88,13 +89,14 @@ function renderRanking(rows) {
   setEl('rk-pe', aPE);
   const tbl=document.getElementById('ranking-tbl'); if(!tbl) return;
   const criterios=getCriterios(), sorted=[...rows].sort((a,b)=>calcScore(b)-calcScore(a));
-  const cols=`1fr 52px ${criterios.map(()=>'38px').join(' ')}`;
+  const cols=`1fr 52px ${criterios.map(()=>'38px').join(' ')} 44px`;
   if (!sorted.length) { tbl.innerHTML='<div class="empty-box"><div class="empty-icon">🏆</div><div class="empty-txt">Sin datos</div></div>'; return; }
   tbl.innerHTML=`
     <div class="tbl-h" style="grid-template-columns:${cols};padding:8px 14px">
       <div class="tbl-th">Miembro</div>
       <div class="tbl-th" style="text-align:center">Pts</div>
       ${criterios.map(c=>`<div class="tbl-th" style="color:${c.color};text-align:center">${c.abbr}</div>`).join('')}
+      <div class="tbl-th" style="color:var(--gold);text-align:center">⭐</div>
     </div>
     ${sorted.map((r,i)=>{
       const s=calcScore(r), rc=i===0?'gold':i===1?'silver':i===2?'bronze':'';
@@ -102,6 +104,7 @@ function renderRanking(rows) {
         <div class="tbl-td tbl-name-cell"><span class="rank-num ${rc}">#${i+1}</span><span>${r.nombre||r.usuario}</span></div>
         <div class="tbl-td tbl-score-cell"><span class="sbadge ${scoreClass(s)}">${s}</span></div>
         ${criterios.map(c=>`<div class="tbl-td" style="text-align:center;padding:8px 4px"><span class="cdot ${dCls(r[c.key])}">${r[c.key]||0}</span></div>`).join('')}
+        <div class="tbl-td" style="text-align:center;padding:8px 4px"><span style="font-family:'Bebas Neue',sans-serif;font-size:1rem;color:${r.ext>0?'var(--gold)':'var(--muted)'}">${r.ext||0}</span></div>
       </div>`;
     }).join('')}`;
 }
@@ -139,7 +142,7 @@ function getAllMembers() {
 /* ── MEMBER DETAIL ── */
 function renderMemberDetail(usuario) {
   const el=document.getElementById('member-detail'); if(!el) return;
-  const criterios=getCriterios(), MAX=getMaxScore();
+  const criterios=getCriterios(), MAX=MAX_TOTAL();
   const sRow=D?.scores?.[aPE]?.find(r=>r.usuario===usuario);
   const fRow=D?.feedback?.[aPE]?.find(r=>r.usuario===usuario);
   const nombre=sRow?.nombre||usuario, total=sRow?calcScore(sRow):null;
@@ -156,7 +159,11 @@ function renderMemberDetail(usuario) {
           <div class="avatar" style="width:44px;height:44px;font-size:1rem">${initials(nombre)}</div>
           <div><div class="member-detail-name">${nombre}</div><div style="font-size:.65rem;color:var(--muted);letter-spacing:1.5px;text-transform:uppercase">${sRow?.rol||'Miembro'}${sRow?.distrito?' · '+sRow.distrito:''}</div></div>
         </div>
-        ${total!==null?`<div style="text-align:right"><div style="font-family:'Bebas Neue',sans-serif;font-size:2.2rem;color:${scoreColor(total)};line-height:1">${total}</div><div style="font-size:.65rem;color:var(--muted)">/ ${MAX} pts · ${scoreLabel(total)}</div></div>`:''}
+        ${total!==null?`<div style="text-align:right">
+          <div style="font-family:'Bebas Neue',sans-serif;font-size:2.2rem;color:${scoreColor(total)};line-height:1">${total}</div>
+          <div style="font-size:.65rem;color:var(--muted)">/ ${MAX} pts · ${scoreLabel(total)}</div>
+          ${sRow?.ext>0?`<div style="margin-top:4px"><span class="bono-badge"><span class="bono-icon">⭐</span>Bono +${sRow.ext}</span></div>`:''}
+        </div>`:''}
       </div>
       <div class="member-detail-body">
         <div class="section-label" style="margin-top:0">Comparativa por período</div>
@@ -192,7 +199,13 @@ function renderScoreEditor(usuario, sRow) {
       <td><span style="display:inline-flex;align-items:center;gap:8px"><span style="width:8px;height:8px;border-radius:50%;background:${c.color};display:inline-block"></span><span style="color:${c.color};font-weight:700">${c.abbr}</span> <span style="color:var(--muted)">${c.label}</span></span></td>
       <td><input type="number" class="score-inp" data-usuario="${esc(usuario)}" data-criterio="${c.key}" data-original="${sRow[c.key]??0}" value="${sRow[c.key]??0}" min="0" max="4" step="1" id="si-${esc(usuario)}-${c.key}" onchange="onScoreChange(this)" oninput="onScoreChange(this)"></td>
     </tr>`).join('');
-  return `<div class="edit-table-wrap"><table class="edit-table"><thead><tr><th style="text-align:left">Criterio</th><th>Puntaje (0–4)</th></tr></thead><tbody>${rows}</tbody></table></div>`;
+  const extVal = sRow.ext ?? 0;
+  const bonoRow = `
+    <tr style="background:rgba(240,192,64,.05);border-top:1px solid rgba(240,192,64,.2)">
+      <td><span style="display:inline-flex;align-items:center;gap:8px"><span style="font-size:.9rem">⭐</span><span style="color:var(--gold);font-weight:700">BONO</span> <span style="color:var(--muted)">Excelencia (+2 máx.)</span></span></td>
+      <td><input type="number" class="score-inp" style="border-color:rgba(240,192,64,.4);color:var(--gold)" data-usuario="${esc(usuario)}" data-criterio="ext" data-original="${extVal}" value="${extVal}" min="0" max="2" step="1" id="si-${esc(usuario)}-ext" onchange="onScoreChange(this)" oninput="onScoreChange(this)"></td>
+    </tr>`;
+  return `<div class="edit-table-wrap"><table class="edit-table"><thead><tr><th style="text-align:left">Criterio</th><th>Puntaje</th></tr></thead><tbody>${rows}${bonoRow}</tbody></table></div>`;
 }
 
 function renderFeedbackEditor(usuario, fRow) {
@@ -208,19 +221,20 @@ function renderFeedbackEditor(usuario, fRow) {
 /* ── SCORE CHANGES ── */
 function onScoreChange(inp) {
   const {usuario, criterio} = inp.dataset;
-  const orig = parseFloat(inp.dataset.original)||0;
-  const val  = Math.min(4,Math.max(0,parseInt(inp.value)||0));
-  inp.value  = val;
-  const key  = `${aPE}_${usuario}_${criterio}`;
+  const orig  = parseFloat(inp.dataset.original)||0;
+  const maxV  = criterio === 'ext' ? 2 : 4;
+  const val   = Math.min(maxV, Math.max(0, parseInt(inp.value)||0));
+  inp.value   = val;
+  const key   = `${aPE}_${usuario}_${criterio}`;
   inp.classList.toggle('changed', val!==orig);
   if (val!==orig) _pendingScores[key]=val; else delete _pendingScores[key];
   showSaveBar(`save-bar-scores-${usuario}`, Object.keys(_pendingScores).some(k=>k.startsWith(`${aPE}_${usuario}_`)));
 }
 function cancelScoreChanges(usuario) {
-  getCriterios().forEach(c=>{
-    const inp=document.getElementById(`si-${usuario}-${c.key}`); if(!inp) return;
+  [...getCriterios().map(c=>c.key), 'ext'].forEach(key => {
+    const inp=document.getElementById(`si-${usuario}-${key}`); if(!inp) return;
     inp.value=inp.dataset.original; inp.classList.remove('changed');
-    delete _pendingScores[`${aPE}_${usuario}_${c.key}`];
+    delete _pendingScores[`${aPE}_${usuario}_${key}`];
   });
   showSaveBar(`save-bar-scores-${usuario}`,false);
 }
@@ -351,10 +365,10 @@ async function handleRefresh() {
 }
 
 /* ── HELPERS ── */
-const calcScore  = row => getCriterios().reduce((s,c)=>s+(row[c.key]||0),0);
-const scoreColor = s => s>=24?'var(--sex)':s>=18?'var(--sbu)':s>=10?'var(--spr)':'var(--sba)';
-const scoreLabel = s => s>=24?'Excelente':s>=18?'Bueno':s>=10?'En Proceso':'Bajo';
-const scoreClass = s => s>=24?'sex':s>=18?'sbu':s>=10?'spr':'sba';
+const calcScore  = row => getCriterios().reduce((s,c)=>s+(row[c.key]||0),0) + (row.ext||0);
+const scoreColor = s => s>=26?'var(--sex)':s>=20?'var(--sbu)':s>=11?'var(--spr)':'var(--sba)';
+const scoreLabel = s => s>=26?'Excelente':s>=20?'Bueno':s>=11?'En Proceso':'Bajo';
+const scoreClass = s => s>=26?'sex':s>=20?'sbu':s>=11?'spr':'sba';
 const dCls       = v => `d${Math.min(4,Math.max(0,v||0))}`;
 const initials   = n => n.split(' ').map(w=>w[0]).slice(0,2).join('').toUpperCase();
 const setEl      = (id,txt) => { const el=document.getElementById(id); if(el) el.textContent=txt; };

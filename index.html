@@ -84,7 +84,7 @@
 /* Redirigir si ya hay sesión */
 (function() {
   const u = Auth.getSession();
-  if (u) window.location.replace(u.rol === 'admin' ? 'admin.html' : 'user.html');
+  if (u) window.location.replace(u.rol === 'admin' ? 'admin.html' : u.rol === 'secretario' ? 'secretario.html' : 'user.html');
 })();
 
 async function doLogin() {
@@ -118,7 +118,8 @@ async function doLogin() {
       return;
     }
     Auth.setSession(found);
-    window.location.replace(found.rol==='admin' ? 'admin.html' : 'user.html');
+    const dest = found.rol === 'admin' ? 'admin.html' : found.rol === 'secretario' ? 'secretario.html' : 'user.html';
+    window.location.replace(dest);
   } catch(e) {
     err.textContent = 'Error al conectar. Intenta de nuevo.';
     err.classList.add('visible');
