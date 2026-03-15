@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <meta name="theme-color" content="#080A0F">
+  <title>EIGHT CREATORS LABs — Portal</title>
+  <link rel="icon" type="image/x-icon" href="icono.ico">
+  <link rel="apple-touch-icon" href="logo.png">
+  <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Barlow+Condensed:wght@300;400;600;700;900&family=Barlow:wght@300;400;500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="shared.css">
+  <style>
+    body { display:flex; align-items:center; justify-content:center; min-height:100vh; overflow:hidden; }
+    .login-page { position:relative; z-index:1; width:100%; max-width:420px; padding:24px 20px; animation:loginIn .5s var(--ease) both; }
+    @keyframes loginIn { from{opacity:0;transform:translateY(24px)} to{opacity:1;transform:translateY(0)} }
+    .login-logo  { display:flex; align-items:center; gap:14px; margin-bottom:28px; justify-content:center; }
+    .logo-img    { width:52px; height:52px; border-radius:var(--r-md); object-fit:contain; }
+    .login-brand h1 { font-family:'Bebas Neue',sans-serif; font-size:1.9rem; letter-spacing:4px; line-height:1; }
+    .login-brand h1 em { color:var(--red); font-style:normal; }
+    .login-brand-sub { font-family:'Barlow Condensed',sans-serif; font-size:.6rem; font-weight:700; letter-spacing:3px; text-transform:uppercase; color:var(--muted); }
+    .login-card { background:var(--glass); border:1px solid var(--glass-border); border-radius:var(--r-xl); padding:30px 28px; backdrop-filter:blur(20px); box-shadow:var(--shadow-lg),0 0 60px rgba(139,38,53,.08); position:relative; overflow:hidden; }
+    .login-card::before { content:''; position:absolute; top:0; left:20%; right:20%; height:1px; background:linear-gradient(90deg,transparent,rgba(224,90,106,.5),transparent); }
+    .login-title { font-family:'Bebas Neue',sans-serif; font-size:1.2rem; letter-spacing:4px; text-align:center; margin-bottom:4px; }
+    .login-sub   { font-family:'Barlow Condensed',sans-serif; font-size:.6rem; letter-spacing:2px; text-transform:uppercase; color:var(--muted); text-align:center; margin-bottom:24px; }
+    .field { margin-bottom:14px; }
+    .field label { display:block; font-family:'Barlow Condensed',sans-serif; font-size:.62rem; font-weight:700; letter-spacing:2px; text-transform:uppercase; color:var(--muted); margin-bottom:6px; }
+    .field input { width:100%; background:var(--s2); border:1px solid var(--faint); border-radius:var(--r-md); color:var(--txt); font-family:'Barlow',sans-serif; font-size:.9rem; padding:11px 14px; transition:border-color .2s,background .2s,box-shadow .2s; }
+    .field input::placeholder { color:var(--muted); }
+    .field input:focus { outline:none; border-color:var(--red); background:rgba(224,90,106,.05); box-shadow:0 0 0 3px rgba(224,90,106,.1); }
+    .btn-login { width:100%; margin-top:8px; padding:13px; background:linear-gradient(135deg,var(--red),#c04050); border-radius:var(--r-md); font-family:'Barlow Condensed',sans-serif; font-size:.78rem; font-weight:700; letter-spacing:3px; text-transform:uppercase; color:#fff; transition:all .2s; box-shadow:0 4px 20px rgba(224,90,106,.3); position:relative; overflow:hidden; }
+    .btn-login::after { content:''; position:absolute; inset:0; background:linear-gradient(135deg,rgba(255,255,255,.1),transparent); opacity:0; transition:opacity .2s; }
+    .btn-login:hover { box-shadow:0 6px 28px rgba(224,90,106,.45); transform:translateY(-1px); }
+    .btn-login:hover::after { opacity:1; }
+    .btn-login:disabled { opacity:.6; pointer-events:none; background:var(--s3); box-shadow:none; }
+    .login-loading { display:none; align-items:center; justify-content:center; gap:10px; margin-top:14px; font-family:'Barlow Condensed',sans-serif; font-size:.7rem; letter-spacing:2px; text-transform:uppercase; color:var(--muted); }
+    .login-loading.visible { display:flex; }
+    .login-err { display:none; margin-top:12px; text-align:center; font-family:'Barlow Condensed',sans-serif; font-size:.72rem; font-weight:700; letter-spacing:1px; text-transform:uppercase; color:var(--red); padding:10px; background:rgba(224,90,106,.08); border:1px solid rgba(224,90,106,.2); border-radius:var(--r-sm); }
+    .login-err.visible { display:block; }
+    @media (max-width:420px) { .login-page{padding:16px 12px} .login-card{padding:24px 18px;border-radius:var(--r-lg)} }
+  </style>
+</head>
+<body>
+<div class="bg-canvas" aria-hidden="true">
+  <div class="bg-orb bg-orb-1"></div>
+  <div class="bg-orb bg-orb-2"></div>
+  <div class="bg-orb bg-orb-3"></div>
+</div>
+<div class="bg-grid" aria-hidden="true"></div>
+
+<main class="login-page">
+  <div class="login-logo">
+    <img src="logo.png" alt="Eight Creators" class="logo-img"
+         onerror="this.style.display='none'">
+    <div class="login-brand">
+      <h1>EIGHT <em>CREATORS</em></h1>
+      <span class="login-brand-sub">LABs — Portal de Evaluación</span>
+    </div>
+  </div>
+  <div class="login-card">
+    <div class="login-title">ACCESO AL PORTAL</div>
+    <div class="login-sub">CELIDER Santiago · Sistema de Evaluación</div>
+    <div class="field">
+      <label for="li-user">Usuario</label>
+      <input type="text" id="li-user" placeholder="Tu usuario"
+             autocomplete="username" onkeydown="if(event.key==='Enter')doLogin()">
+    </div>
+    <div class="field">
+      <label for="li-pass">Contraseña</label>
+      <input type="password" id="li-pass" placeholder="••••••••"
+             autocomplete="current-password" onkeydown="if(event.key==='Enter')doLogin()">
+    </div>
+    <button class="btn-login" id="btn-login" onclick="doLogin()">Ingresar al Portal</button>
+    <div class="login-loading" id="li-loading"><span class="spin"></span>Verificando acceso...</div>
+    <div class="login-err"     id="li-err">Usuario o contraseña incorrectos.</div>
+  </div>
+</main>
+
+<div class="toast" id="toast"></div>
+<script src="config.js"></script>
+<script src="api.js"></script>
+<script src="auth.js"></script>
+<script>
+'use strict';
+/* Redirigir si ya hay sesión */
+(function() {
+  const u = Auth.getSession();
+  if (u) window.location.replace(u.rol === 'admin' ? 'admin.html' : 'user.html');
+})();
+
+async function doLogin() {
+  const uEl  = document.getElementById('li-user');
+  const pEl  = document.getElementById('li-pass');
+  const btn  = document.getElementById('btn-login');
+  const load = document.getElementById('li-loading');
+  const err  = document.getElementById('li-err');
+  const user = uEl.value.trim(), pass = pEl.value.trim();
+
+  if (!user || !pass) { err.textContent='Ingresa usuario y contraseña.'; err.classList.add('visible'); uEl.focus(); return; }
+
+  err.classList.remove('visible');
+  load.classList.add('visible');
+  btn.disabled = true;
+
+  try {
+    const data = await API.getData();
+    Auth.setCachedData(data);
+
+    let found = (data.users||[]).find(u => u.user===user && String(u.pass)===String(pass));
+    if (!found && user==='admin' && pass==='admin2025')
+      found = { user:'admin', pass:'', name:'Administrador', rol:'admin' };
+
+    if (!found) {
+      err.textContent = 'Usuario o contraseña incorrectos.';
+      err.classList.add('visible');
+      load.classList.remove('visible');
+      btn.disabled = false;
+      pEl.value = ''; pEl.focus();
+      return;
+    }
+    Auth.setSession(found);
+    window.location.replace(found.rol==='admin' ? 'admin.html' : 'user.html');
+  } catch(e) {
+    err.textContent = 'Error al conectar. Intenta de nuevo.';
+    err.classList.add('visible');
+    load.classList.remove('visible');
+    btn.disabled = false;
+  }
+}
+
+function showToast(msg, type='') {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.className   = `toast${type?' toast--'+type:''} show`;
+  setTimeout(()=>t.classList.remove('show'), 3000);
+}
+</script>
+</body>
+</html>

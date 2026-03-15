@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <meta name="theme-color" content="#080A0F">
+  <title>EIGHT CREATORS LABs — Admin</title>
+  <link rel="icon" type="image/x-icon" href="icono.ico">
+  <link rel="apple-touch-icon" href="logo.png">
+  <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Barlow+Condensed:wght@300;400;600;700;900&family=Barlow:wght@300;400;500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="shared.css">
+  <link rel="stylesheet" href="admin.css">
+</head>
+<body>
+
+<div class="bg-canvas" aria-hidden="true">
+  <div class="bg-orb bg-orb-1"></div>
+  <div class="bg-orb bg-orb-2"></div>
+  <div class="bg-orb bg-orb-3"></div>
+</div>
+<div class="bg-grid" aria-hidden="true"></div>
+
+<!-- TOPBAR -->
+<header class="topbar" id="topbar">
+  <div class="tb-brand">
+    <img src="logo.png" alt="" class="tb-logo" onerror="this.style.display='none'">
+    <span class="tb-title">EIGHT<em> CREATORS</em></span>
+    <span class="admin-badge">ADMIN</span>
+  </div>
+  <nav class="tb-nav" id="desktop-nav">
+    <button class="tnav active" onclick="switchTab('overview',this)">Overview</button>
+    <button class="tnav"        onclick="switchTab('ranking',this)">Ranking</button>
+    <button class="tnav"        onclick="switchTab('criterios',this)">Criterios</button>
+    <button class="tnav"        onclick="switchTab('miembros',this)">Miembros</button>
+    <button class="tnav"        onclick="switchTab('rubrica',this)">Rúbrica</button>
+    <button class="tnav" style="color:var(--gold)" onclick="switchTab('debug',this)">🔍</button>
+  </nav>
+  <div class="tb-user">
+    <div class="avatar admin-av">A</div>
+    <span class="uname">ADMIN</span>
+    <button class="btn-out" onclick="logout()">Salir</button>
+  </div>
+  <button class="hamburger" id="hamburger" aria-label="Menú" aria-expanded="false" onclick="toggleMenu()">
+    <span></span><span></span><span></span>
+  </button>
+</header>
+
+<!-- MOBILE MENU -->
+<div class="mobile-menu" id="mobile-menu">
+  <div class="mobile-nav-links">
+    <button class="mobile-nav-btn active" onclick="switchTabMobile('overview',this)">📊 &nbsp;Overview</button>
+    <button class="mobile-nav-btn"        onclick="switchTabMobile('ranking',this)">🏆 &nbsp;Ranking</button>
+    <button class="mobile-nav-btn"        onclick="switchTabMobile('criterios',this)">📈 &nbsp;Criterios</button>
+    <button class="mobile-nav-btn"        onclick="switchTabMobile('miembros',this)">👥 &nbsp;Miembros</button>
+    <button class="mobile-nav-btn"        onclick="switchTabMobile('rubrica',this)">📋 &nbsp;Rúbrica</button>
+    <button class="mobile-nav-btn" style="color:var(--gold)" onclick="switchTabMobile('debug',this)">🔍 &nbsp;Diagnóstico</button>
+    <button class="mobile-nav-btn mobile-nav-btn--refresh" onclick="handleRefresh();closeMenu()">
+      <svg class="refresh-icon" viewBox="0 0 16 16" fill="none"><path d="M13.65 2.35A8 8 0 1 0 15 8h-1.5A6.5 6.5 0 1 1 8 1.5a6.44 6.44 0 0 1 4.59 1.91L10.5 5.5H15V1l-1.35 1.35z" fill="currentColor"/></svg>
+      &nbsp;Actualizar datos
+    </button>
+  </div>
+  <div class="mobile-user-section">
+    <div class="avatar admin-av">A</div>
+    <div class="mobile-uinfo">
+      <div class="mobile-uname">ADMINISTRADOR</div>
+      <div class="mobile-urole">Panel de control</div>
+      <div class="last-updated-badge" id="ts-badge-mob"></div>
+    </div>
+    <button class="btn-out-mobile" onclick="logout()">Salir</button>
+  </div>
+</div>
+
+<!-- CONTENIDO ADMIN -->
+<div class="amain">
+
+  <!-- Barra PE + refresh -->
+  <div class="admin-pe-bar">
+    <span class="admin-pe-lbl">Período:</span>
+    <div class="pe-row pe-row--no-mb">
+      <button class="pb active" onclick="selectPE('PE1',this)">PE1</button>
+      <button class="pb"        onclick="selectPE('PE2',this)">PE2</button>
+      <button class="pb"        onclick="selectPE('PE3',this)">PE3</button>
+    </div>
+    <div style="flex:1"></div>
+    <span class="last-updated-badge" id="ts-badge"></span>
+    <button class="btn-refresh" id="btn-refresh" onclick="handleRefresh()">
+      <svg class="refresh-icon" viewBox="0 0 16 16" fill="none"><path d="M13.65 2.35A8 8 0 1 0 15 8h-1.5A6.5 6.5 0 1 1 8 1.5a6.44 6.44 0 0 1 4.59 1.91L10.5 5.5H15V1l-1.35 1.35z" fill="currentColor"/></svg>
+      Actualizar
+      <span class="auto-refresh-dot" title="Auto-refresh cada 60s"></span>
+    </button>
+  </div>
+
+  <!-- OVERVIEW -->
+  <div id="tab-overview" class="atab-content active">
+    <div class="ptitle">OVERVIEW — <span id="ov-pe">PE1</span></div>
+    <div class="stat-cards" id="ov-stats"><div class="loading-box"><span class="spin"></span></div></div>
+    <div class="two-col-grid">
+      <div class="section-panel">
+        <div class="section-label">Distribución de niveles</div>
+        <div id="ov-dist"></div>
+      </div>
+      <div class="section-panel">
+        <div class="section-label">Promedio por criterio</div>
+        <div id="ov-criterios"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- RANKING -->
+  <div id="tab-ranking" class="atab-content">
+    <div class="ptitle">RANKING — <span id="rk-pe">PE1</span></div>
+    <div class="tbl" id="ranking-tbl"></div>
+  </div>
+
+  <!-- CRITERIOS -->
+  <div id="tab-criterios" class="atab-content">
+    <div class="ptitle">ANÁLISIS POR CRITERIO — <span id="cr-pe">PE1</span></div>
+    <div class="crit-detail-grid" id="crit-grid"></div>
+  </div>
+
+  <!-- MIEMBROS -->
+  <div id="tab-miembros" class="atab-content">
+    <div class="ptitle">DETALLE POR MIEMBRO</div>
+    <div class="member-chips" id="member-chips"></div>
+    <div id="member-detail"></div>
+  </div>
+
+  <!-- RÚBRICA -->
+  <div id="tab-rubrica" class="atab-content">
+    <div class="ptitle">TABLA DE PUNTUACIÓN</div>
+    <div class="rubrica-wrap">
+      <p class="rubrica-intro">Cada criterio se evalúa del <strong>1 al 4</strong>. Puntaje máximo: <strong>28 puntos</strong>.</p>
+      <div class="rubrica-grid" id="rubrica-grid"></div>
+    </div>
+  </div>
+
+  <!-- DEBUG -->
+  <div id="tab-debug" class="atab-content">
+    <div id="debug-content"></div>
+  </div>
+
+</div>
+
+<div class="toast" id="toast"></div>
+<script src="config.js"></script>
+<script src="api.js"></script>
+<script src="auth.js"></script>
+<script src="admin.js"></script>
+</body>
+</html>
