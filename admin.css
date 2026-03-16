@@ -122,3 +122,285 @@
   .score-inp{width:38px}
   .edit-table th, .edit-table td{padding:6px 6px}
 }
+
+/* ══════════════════════════════════════════════════
+   ADMIN — PANEL DE DISTRITOS
+   ══════════════════════════════════════════════════ */
+
+.admin-dist-card {
+  background: var(--glass);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--r-lg);
+  overflow: hidden;
+  margin-bottom: 10px;
+  transition: border-color .2s;
+}
+.admin-dist-card:hover { border-color: var(--border-glow); }
+
+.admin-dist-head {
+  display: flex; align-items: center; gap: 12px;
+  padding: 16px 20px;
+  cursor: pointer;
+  user-select: none;
+  transition: background .2s;
+}
+.admin-dist-head:hover { background: rgba(255,255,255,.02); }
+
+.dist-rk-pos-admin {
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: 1.5rem; line-height: 1;
+  width: 42px; text-align: right; flex-shrink: 0;
+  color: var(--muted);
+}
+.dist-rk-pos-admin.gold   { color: #F0C040; text-shadow: 0 0 12px rgba(240,192,64,.5); }
+.dist-rk-pos-admin.silver { color: #B0B8D0; }
+.dist-rk-pos-admin.bronze { color: #C87C40; }
+
+.admin-dist-chev {
+  font-size: .9rem; color: var(--muted);
+  transition: transform .25s var(--ease);
+  flex-shrink: 0;
+}
+
+.admin-dist-body {
+  border-top: 1px solid var(--border);
+  padding: 18px 20px;
+  animation: tabIn .2s var(--ease);
+}
+
+.admin-dist-expand-grid {
+  display: grid;
+  grid-template-columns: 280px 1fr;
+  gap: 24px;
+}
+
+/* Lista de miembros del distrito */
+.admin-dist-members-list {
+  display: flex; flex-direction: column; gap: 6px;
+}
+
+.admin-dist-member-row {
+  display: flex; align-items: center; gap: 10px;
+  padding: 8px 12px;
+  background: var(--s2);
+  border-radius: var(--r-sm);
+  border: 1px solid var(--border);
+  transition: border-color .15s;
+}
+.admin-dist-member-row:hover { border-color: var(--border-glow); }
+
+.admin-dist-edit-btn {
+  padding: 5px 10px;
+  font-family: 'Barlow Condensed', sans-serif;
+  font-size: .62rem; font-weight: 700;
+  letter-spacing: 1.5px; text-transform: uppercase;
+  color: var(--muted);
+  border: 1px solid var(--faint);
+  border-radius: var(--r-sm);
+  transition: all .15s;
+  flex-shrink: 0;
+  white-space: nowrap;
+}
+.admin-dist-edit-btn:hover {
+  color: var(--blue);
+  border-color: var(--blue);
+  background: rgba(91,127,255,.08);
+}
+
+@media (max-width: 900px) {
+  .admin-dist-expand-grid { grid-template-columns: 1fr; }
+}
+@media (max-width: 600px) {
+  .admin-dist-head { gap: 8px; padding: 12px 14px; }
+  .admin-dist-body { padding: 14px; }
+}
+
+/* ══════════════════════════════════════════════════
+   TOGGLE CREATORS / DISTRITOS
+   ══════════════════════════════════════════════════ */
+.eval-toggle-bar {
+  display: flex; align-items: center; gap: 12px;
+  margin-bottom: 20px; flex-wrap: wrap;
+}
+.eval-toggle-lbl {
+  font-family: 'Barlow Condensed', sans-serif;
+  font-size: .6rem; font-weight: 700;
+  letter-spacing: 3px; text-transform: uppercase;
+  color: var(--muted);
+}
+.eval-toggle-btns { display: flex; gap: 6px; }
+.eval-toggle-btn {
+  padding: 8px 18px;
+  font-family: 'Barlow Condensed', sans-serif;
+  font-size: .7rem; font-weight: 700;
+  letter-spacing: 1.5px; text-transform: uppercase;
+  color: var(--muted);
+  border: 1px solid var(--faint);
+  border-radius: 20px;
+  transition: all .2s;
+}
+.eval-toggle-btn:hover  { color: var(--txt); border-color: var(--border-glow); }
+.eval-toggle-btn.active { color: #fff; background: linear-gradient(135deg,var(--red),#c04050); border-color: transparent; box-shadow: 0 0 14px rgba(224,90,106,.3); }
+
+/* ══════════════════════════════════════════════════
+   EDITOR DE DISTRITOS
+   ══════════════════════════════════════════════════ */
+.dist-editor-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: 14px;
+}
+.dist-editor-card {
+  background: var(--glass);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--r-lg);
+  overflow: hidden;
+  transition: border-color .2s;
+}
+.dist-editor-card:hover { border-color: var(--border-glow); }
+.dist-editor-head {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 14px 18px 10px;
+  border-bottom: 1px solid var(--border);
+}
+.dist-editor-name {
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: 1.3rem; letter-spacing: 2px;
+}
+.dist-editor-total {
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: 1.6rem; color: var(--blue); line-height: 1;
+}
+.dist-editor-total-lbl { font-size: .58rem; color: var(--muted); text-align: right; letter-spacing: 1px; font-family:'Barlow Condensed',sans-serif; text-transform:uppercase; }
+.dist-editor-body { padding: 14px 18px 16px; }
+.dist-comp-row {
+  display: flex; align-items: center; gap: 10px;
+  margin-bottom: 10px;
+}
+.dist-comp-info { flex: 1; min-width: 0; }
+.dist-comp-name {
+  font-family: 'Barlow Condensed', sans-serif;
+  font-size: .7rem; font-weight: 700;
+  letter-spacing: 1px; text-transform: uppercase;
+}
+.dist-comp-abbr { font-size: .6rem; color: var(--muted); }
+.dist-comp-inp {
+  width: 50px; height: 36px;
+  background: var(--s3); border: 1px solid var(--faint);
+  border-radius: var(--r-sm); color: var(--txt);
+  font-family: 'Bebas Neue', sans-serif; font-size: 1.1rem;
+  text-align: center; transition: border-color .2s, background .2s;
+  -moz-appearance: textfield;
+}
+.dist-comp-inp::-webkit-inner-spin-button,
+.dist-comp-inp::-webkit-outer-spin-button { -webkit-appearance: none; }
+.dist-comp-inp:focus { outline: none; border-color: var(--blue); background: rgba(91,127,255,.08); box-shadow: 0 0 0 2px rgba(91,127,255,.15); }
+.dist-comp-inp.changed { border-color: var(--gold); background: rgba(240,192,64,.08); color: var(--gold); }
+.dist-comp-track {
+  flex: 1; height: 4px; background: var(--faint);
+  border-radius: 2px; overflow: hidden;
+}
+.dist-comp-fill { height: 100%; border-radius: 2px; transition: width .4s var(--ease); }
+
+/* ══════════════════════════════════════════════════
+   EDITOR DE CALENDARIO — Admin
+   ══════════════════════════════════════════════════ */
+
+.cal-editor-toolbar {
+  display: flex; align-items: center; gap: 12px;
+  margin-bottom: 18px; flex-wrap: wrap;
+}
+.btn-add-evento {
+  padding: 9px 18px;
+  font-family: 'Barlow Condensed', sans-serif;
+  font-size: .7rem; font-weight: 700;
+  letter-spacing: 1.5px; text-transform: uppercase;
+  color: #fff;
+  background: linear-gradient(135deg, var(--blue), #2D3478);
+  border-radius: var(--r-sm);
+  transition: all .2s;
+  box-shadow: 0 0 14px rgba(91,127,255,.25);
+}
+.btn-add-evento:hover { box-shadow: 0 0 22px rgba(91,127,255,.45); transform: translateY(-1px); }
+
+.btn-save-cal {
+  display: flex; align-items: center; gap: 6px;
+  padding: 9px 18px;
+  background: linear-gradient(135deg, var(--green), #1fa55a);
+  border-radius: var(--r-sm);
+  font-family: 'Barlow Condensed', sans-serif;
+  font-size: .68rem; font-weight: 700;
+  letter-spacing: 2px; text-transform: uppercase;
+  color: #fff; transition: all .2s;
+  box-shadow: 0 0 14px rgba(46,204,113,.25);
+}
+.btn-save-cal:hover { box-shadow: 0 0 22px rgba(46,204,113,.4); transform: translateY(-1px); }
+.btn-save-cal.hidden { display: none !important; }
+.btn-save-cal.saving { opacity:.5; pointer-events:none; }
+
+/* Tarjeta de evento */
+.cal-ev-card {
+  background: var(--glass);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--r-lg);
+  margin-bottom: 10px;
+  overflow: hidden;
+  transition: border-color .2s;
+  padding: 14px 18px;
+}
+.cal-ev-card:hover { border-color: var(--border-glow); }
+
+.cal-ev-head {
+  display: flex; align-items: center; gap: 10px;
+  margin-bottom: 12px; flex-wrap: wrap;
+}
+.cal-ev-num { display: flex; align-items: center; gap: 4px; }
+
+.cal-ev-delete {
+  margin-left: auto;
+  padding: 4px 10px;
+  font-size: .8rem; color: var(--muted);
+  border: 1px solid var(--faint);
+  border-radius: var(--r-sm);
+  transition: all .15s; flex-shrink: 0;
+}
+.cal-ev-delete:hover { color: var(--red); border-color: var(--red); background: rgba(224,90,106,.08); }
+
+/* Inputs del calendario */
+.cal-inp {
+  background: var(--s2);
+  border: 1px solid var(--faint);
+  border-radius: var(--r-sm);
+  color: var(--txt);
+  font-family: 'Barlow', sans-serif;
+  font-size: .82rem;
+  padding: 7px 10px;
+  transition: border-color .2s, background .2s;
+}
+.cal-inp:focus { outline: none; border-color: var(--blue); background: rgba(91,127,255,.06); }
+.cal-inp--num   { width: 60px; font-family: 'Bebas Neue', sans-serif; font-size: 1.1rem; text-align: center; -moz-appearance: textfield; }
+.cal-inp--num::-webkit-inner-spin-button, .cal-inp--num::-webkit-outer-spin-button { -webkit-appearance: none; }
+.cal-inp--title { flex: 1; min-width: 160px; font-weight: 500; }
+.cal-inp--color { font-family: 'Barlow Condensed', sans-serif; font-size: .7rem; font-weight: 700; letter-spacing: 1px; border-width: 2px; }
+.cal-inp--estado{ font-family: 'Barlow Condensed', sans-serif; font-size: .7rem; font-weight: 700; letter-spacing: 1px; }
+.cal-inp--date  { width: 110px; font-size: .78rem; }
+
+/* Fechas en grid */
+.cal-ev-dates {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: 10px;
+}
+.cal-date-field { display: flex; flex-direction: column; gap: 4px; }
+.cal-date-lbl {
+  font-family: 'Barlow Condensed', sans-serif;
+  font-size: .58rem; font-weight: 700;
+  letter-spacing: 2px; text-transform: uppercase;
+  color: var(--muted);
+}
+
+@media (max-width:600px) {
+  .cal-ev-head { gap: 6px; }
+  .cal-inp--title { min-width: 100px; }
+  .cal-ev-dates { grid-template-columns: 1fr 1fr; }
+}

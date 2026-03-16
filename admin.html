@@ -31,8 +31,10 @@
     <button class="tnav active" onclick="switchTab('overview',this)">Overview</button>
     <button class="tnav"        onclick="switchTab('ranking',this)">Ranking</button>
     <button class="tnav"        onclick="switchTab('criterios',this)">Criterios</button>
+    <button class="tnav"        onclick="switchTab('distritos',this)">Distritos</button>
     <button class="tnav"        onclick="switchTab('miembros',this)">Miembros</button>
     <button class="tnav"        onclick="switchTab('rubrica',this)">Rúbrica</button>
+    <button class="tnav"                           onclick="switchTab('calendario',this)">Calendario</button>
     <button class="tnav" style="color:var(--gold)" onclick="switchTab('debug',this)">🔍</button>
   </nav>
   <div class="tb-user">
@@ -51,8 +53,10 @@
     <button class="mobile-nav-btn active" onclick="switchTabMobile('overview',this)">📊 &nbsp;Overview</button>
     <button class="mobile-nav-btn"        onclick="switchTabMobile('ranking',this)">🏆 &nbsp;Ranking</button>
     <button class="mobile-nav-btn"        onclick="switchTabMobile('criterios',this)">📈 &nbsp;Criterios</button>
+    <button class="mobile-nav-btn"        onclick="switchTabMobile('distritos',this)">🗺️ &nbsp;Distritos</button>
     <button class="mobile-nav-btn"        onclick="switchTabMobile('miembros',this)">👥 &nbsp;Miembros</button>
     <button class="mobile-nav-btn"        onclick="switchTabMobile('rubrica',this)">📋 &nbsp;Rúbrica</button>
+    <button class="mobile-nav-btn"                           onclick="switchTabMobile('calendario',this)">📅 &nbsp;Calendario</button>
     <button class="mobile-nav-btn" style="color:var(--gold)" onclick="switchTabMobile('debug',this)">🔍 &nbsp;Diagnóstico</button>
     <button class="mobile-nav-btn mobile-nav-btn--refresh" onclick="handleRefresh();closeMenu()">
       <svg class="refresh-icon" viewBox="0 0 16 16" fill="none"><path d="M13.65 2.35A8 8 0 1 0 15 8h-1.5A6.5 6.5 0 1 1 8 1.5a6.44 6.44 0 0 1 4.59 1.91L10.5 5.5H15V1l-1.35 1.35z" fill="currentColor"/></svg>
@@ -118,11 +122,35 @@
     <div class="crit-detail-grid" id="crit-grid"></div>
   </div>
 
-  <!-- MIEMBROS -->
+  <!-- DISTRITOS -->
+  <div id="tab-distritos" class="atab-content">
+    <div class="ptitle">RANKING DE DISTRITOS — <span id="dist-admin-pe">PE1</span></div>
+    <div class="stat-cards" id="dist-admin-stats"></div>
+    <div id="dist-admin-list"></div>
+  </div>
+
+  <!-- MIEMBROS / DISTRITOS (con toggle) -->
   <div id="tab-miembros" class="atab-content">
-    <div class="ptitle">DETALLE POR MIEMBRO</div>
-    <div class="member-chips" id="member-chips"></div>
-    <div id="member-detail"></div>
+    <div class="ptitle">EVALUACIÓN</div>
+    <!-- Toggle Creators / Distritos -->
+    <div class="eval-toggle-bar">
+      <span class="eval-toggle-lbl">Calificar:</span>
+      <div class="eval-toggle-btns">
+        <button class="eval-toggle-btn active" id="etb-creators" onclick="setEvalMode('creators')">👤 Creators</button>
+        <button class="eval-toggle-btn"         id="etb-distritos" onclick="setEvalMode('distritos')">🗺️ Distritos</button>
+      </div>
+    </div>
+
+    <!-- Panel Creators -->
+    <div id="eval-creators-panel">
+      <div class="member-chips" id="member-chips"></div>
+      <div id="member-detail"></div>
+    </div>
+
+    <!-- Panel Distritos -->
+    <div id="eval-distritos-panel" style="display:none">
+      <div id="district-editor"></div>
+    </div>
   </div>
 
   <!-- RÚBRICA -->
@@ -132,6 +160,20 @@
       <p class="rubrica-intro">Cada criterio se evalúa del <strong>1 al 4</strong>. Puntaje máximo: <strong>28 puntos</strong>.</p>
       <div class="rubrica-grid" id="rubrica-grid"></div>
     </div>
+  </div>
+
+  <!-- CALENDARIO -->
+  <div id="tab-calendario" class="atab-content">
+    <div class="ptitle">CALENDARIO DE EVALUACIONES</div>
+    <div class="cal-editor-toolbar">
+      <button class="btn-add-evento" onclick="addCalEvento()">+ Agregar actividad</button>
+      <div style="flex:1"></div>
+      <button class="btn-save btn-save-cal hidden" id="btn-save-cal" onclick="saveCalendarioAdmin()">
+        <svg viewBox="0 0 16 16" width="14" height="14" fill="none"><path d="M13.5 4.5L6 12 2.5 8.5" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+        Guardar calendario
+      </button>
+    </div>
+    <div id="cal-editor-list"></div>
   </div>
 
   <!-- DEBUG -->

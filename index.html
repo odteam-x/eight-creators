@@ -84,7 +84,7 @@
 /* Redirigir si ya hay sesión */
 (function() {
   const u = Auth.getSession();
-  if (u) window.location.replace(u.rol === 'admin' ? 'admin.html' : u.rol === 'secretario' ? 'secretario.html' : 'user.html');
+  if (u) window.location.replace(u.rol === 'admin' ? 'admin.html' : 'secretario.html');
 })();
 
 async function doLogin() {
@@ -95,31 +95,41 @@ async function doLogin() {
   const err  = document.getElementById('li-err');
   const user = uEl.value.trim(), pass = pEl.value.trim();
 
-  if (!user || !pass) { err.textContent='Ingresa usuario y contraseña.'; err.classList.add('visible'); uEl.focus(); return; }
+  if (!user || !pass) {
+    err.textContent = 'Ingresa usuario y contraseña.';
+    err.classList.add('visible');
+    uEl.focus();
+    return;
+  }
 
   err.classList.remove('visible');
   load.classList.add('visible');
   btn.disabled = true;
 
   try {
-    const data = await API.getData();
-    Auth.setCachedData(data);
+    // Login liviano — el backend solo verifica credenciales, no devuelve scores
+    const res = await API.login(user, pass);
 
-    let found = (data.users||[]).find(u => u.user===user && String(u.pass)===String(pass));
-    if (!found && user==='admin' && pass==='admin2025')
-      found = { user:'admin', pass:'', name:'Administrador', rol:'admin' };
-
-    if (!found) {
-      err.textContent = 'Usuario o contraseña incorrectos.';
+    if (!res.ok) {
+      err.textContent = res.error || 'Usuario o contraseña incorrectos.';
       err.classList.add('visible');
       load.classList.remove('visible');
       btn.disabled = false;
       pEl.value = ''; pEl.focus();
       return;
     }
-    Auth.setSession(found);
-    const dest = found.rol === 'admin' ? 'admin.html' : found.rol === 'secretario' ? 'secretario.html' : 'user.html';
+
+    // Guardar sesión con los datos del usuario autenticado
+    Auth.setSession({
+      user:     res.user,
+      name:     res.name,
+      rol:      res.rol,
+      distrito: res.distrito || '',
+    });
+
+    const dest = res.rol === 'admin' ? 'admin.html' : 'secretario.html';
     window.location.replace(dest);
+
   } catch(e) {
     err.textContent = 'Error al conectar. Intenta de nuevo.';
     err.classList.add('visible');

@@ -1,10 +1,12 @@
 /**
- * EIGHT CREATORS LABs — Lógica Vista Secretario de Comunicaciones
+ * EIGHT CREATORS LABs — Portal (Secretario + Miembro)
+ * Secretario ve: Mi Score, Ranking, Mi Distrito, Criterios, Rúbrica, Calendario
+ * Miembro   ve: Mi Score,           Mi Distrito, Criterios, Rúbrica, Calendario
  */
 'use strict';
 
 let CU = null, D = null;
-let mPE='PE1', rPE='PE1', cPE='PE1';
+let mPE='PE1', rPE='PE1', dPE='PE1';
 let _arTimer=null, _lastUpdated=null, _menuOpen=false;
 
 const CRITERIOS_DEFAULT = [
@@ -20,26 +22,25 @@ const CRITERIOS_DEFAULT = [
 const getCriterios = () => D?.criterios?.length ? D.criterios : CRITERIOS_DEFAULT;
 const getMaxScore  = () => getCriterios().length * 4;
 const MAX_TOTAL    = () => getMaxScore() + 2;
+const isSecretario = () => CU?.rol === 'secretario';
 
 function getMyDistrito() {
   if (!CU) return '';
-  if (CU.distrito) return CU.distrito;
-  if (CU.districtKey && D?.districtKeys) return D.districtKeys[CU.districtKey] || CU.districtKey;
-  return '';
+  return (CU.distrito || '').trim();
 }
 
-// Solo devuelve filas del distrito del secretario
 function getDistritoRows(pe) {
-  const myDistrito = getMyDistrito();
-  const all = D?.scores?.[pe] || [];
-  if (!myDistrito) return all;
-  return all.filter(r => String(r.distrito||'').trim().toLowerCase() === myDistrito.toLowerCase());
+  const myD = getMyDistrito();
+  const all  = D?.scores?.[pe] || [];
+  if (!myD) return all;
+  return all.filter(r => String(r.distrito||'').trim().toLowerCase() === myD.toLowerCase());
 }
 
 /* ── BOOT ── */
 document.addEventListener('DOMContentLoaded', async () => {
-  CU = Auth.requireRole('secretario');
+  CU = Auth.requireAnyRole(['secretario','miembro']);
   if (!CU) return;
+
   const cached = Auth.getCachedData();
   if (cached) { D = cached; initUI(); }
   await loadData();
@@ -49,36 +50,51 @@ document.addEventListener('DOMContentLoaded', async () => {
 
 async function loadData() {
   try {
-    const data = await API.getData();
+    const data = await API.getSecretarioData(CU.user);
     if (data.ok !== false) {
       D = data;
-      if (!CU.distrito && CU.districtKey && data.districtKeys) {
-        CU.distrito = data.districtKeys[CU.districtKey] || CU.districtKey;
+      if (data.myDistrito) {
+        CU.distrito = data.myDistrito;
         Auth.setSession(CU);
       }
       Auth.setCachedData(data);
       _lastUpdated = new Date();
     }
-  } catch(e) { console.error('[Secretario]', e); }
+  } catch(e) { console.error('[Portal]', e); }
 }
 
 function startAutoRefresh() {
   if (_arTimer) clearInterval(_arTimer);
   _arTimer = setInterval(async () => {
     await loadData();
-    renderMyScore(mPE); renderDistrito(rPE); renderCriterios(cPE);
+    renderMyScore(mPE); renderRankingDistritos(dPE); renderDistrito(rPE);
     renderCalendario(); updateTimestamp();
   }, PORTAL_CONFIG.AUTO_REFRESH_MS);
 }
 
 function initUI() {
   if (!CU || !D) return;
+
+  // Mostrar/ocultar elementos exclusivos del secretario
+  const sec = isSecretario();
+  document.querySelectorAll('.sec-only').forEach(el => { el.style.display = sec ? '' : 'none'; });
+  document.getElementById('dist-calificacion')?.style && (document.getElementById('dist-calificacion').style.display = sec ? 'block' : 'none');
+
+  // Badge de rol
+  const badge = document.getElementById('role-badge');
+  if (badge) { badge.textContent = sec ? 'SECRETARIO' : 'CREATOR'; badge.className = sec ? 'secretario-badge' : 'portal-badge'; }
+  const rolMob = document.getElementById('role-label-mob');
+  if (rolMob) rolMob.textContent = sec ? 'Secretario de Comunicaciones' : 'Creator';
+
+  // Datos de usuario en UI
   const name = CU.name || CU.user, ini = initials(name);
   setEl('av-desktop',ini); setEl('av-mobile',ini);
   setEl('uname-desktop',name); setEl('uname-mobile',name);
   setEl('hero-name',name);
+  setEl('hero-tag', sec ? 'SECRETARIO DE COMUNICACIONES · CELIDER' : 'CREATOR · CELIDER');
+
   renderDistritoHeader();
-  renderMyScore('PE1'); renderDistrito('PE1'); renderCriterios('PE1');
+  renderMyScore('PE1'); renderRankingDistritos('PE1'); renderDistrito('PE1');
   renderRubrica(); renderCalendario(); updateTimestamp();
   initScrollEffects();
 }
@@ -88,7 +104,7 @@ function renderDistritoHeader() {
   const el = document.getElementById('distrito-header'); if (!el) return;
   const nombre = getMyDistrito();
   if (!nombre) {
-    el.innerHTML = `<div style="padding:14px 0"><div style="font-family:'Barlow Condensed',sans-serif;font-size:.65rem;letter-spacing:3px;text-transform:uppercase;color:var(--red);margin-bottom:4px">⚠ Sin distrito asignado</div><div style="font-size:.8rem;color:var(--muted)">Agrega la clave de distrito en la columna E de USUARIOS y configura DISTRICT_KEYS en Code.gs.</div></div>`;
+    el.innerHTML = `<div style="padding:14px 0"><div style="font-family:'Barlow Condensed',sans-serif;font-size:.65rem;letter-spacing:3px;text-transform:uppercase;color:var(--red);margin-bottom:4px">⚠ Sin distrito asignado</div></div>`;
     return;
   }
   el.innerHTML = `<div class="distrito-title-block"><div class="distrito-label">TU DISTRITO</div><div class="distrito-nombre">${nombre}</div></div>`;
@@ -138,7 +154,7 @@ function renderMyScore(pe) {
       <div class="sse-left">
         <div class="sse-label">Puntaje total — ${pe}</div>
         <div class="sse-name">${CU.name||CU.user}</div>
-        <div class="sse-role">Secretario · ${getMyDistrito()||'Sin distrito'}</div>
+        <div class="sse-role">${isSecretario()?'Secretario':'Creator'} · ${getMyDistrito()||'Sin distrito'}</div>
         ${ext>0?`<div style="margin-top:8px"><span class="bono-badge"><span class="bono-icon">⭐</span>Bono +${ext}</span></div>`:''}
       </div>
       <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
@@ -175,6 +191,99 @@ function renderTendenciaInline() {
     </div>${arrow}</div>`;
 }
 
+/* ── RANKING DE DISTRITOS (solo secretario) ── */
+function selectPERankDist(pe, btn) {
+  dPE = pe;
+  document.querySelectorAll('#tab-ranking .pe-row .pb').forEach(b=>b.classList.remove('active'));
+  btn.classList.add('active'); renderRankingDistritos(pe);
+}
+
+function renderRankingDistritos(pe) {
+  const el = document.getElementById('ranking-dist-body');
+  if (!el) return;
+  if (!D) { el.innerHTML='<div class="loading-box"><span class="spin"></span></div>'; return; }
+
+  // Usar datos de distritos directamente del sheet (filas 23+)
+  const districts = D.districtScores?.[pe] || [];
+  const myDistrito = getMyDistrito();
+
+  if (!districts.length) {
+    el.innerHTML=`<div class="empty-box"><div class="empty-icon">🏆</div><div class="empty-txt">Sin datos de ranking para ${pe}.</div></div>`;
+    return;
+  }
+
+  const myIdx = districts.findIndex(d => d.distrito.toLowerCase() === myDistrito.toLowerCase());
+  const myPos  = myIdx + 1;
+  const myDist = myIdx >= 0 ? districts[myIdx] : null;
+  const COMP = D?.distCompetencias || [
+    { key:'cgo', label:'Gestión y Organización', abbr:'CGO', color:'#38BDF8', max:7 },
+    { key:'cct', label:'Creativa y Técnica',     abbr:'CCT', color:'#2ECC71', max:7 },
+    { key:'com', label:'Comunicativa',           abbr:'COM', color:'#C084FC', max:7 },
+    { key:'cee', label:'Ejecución Estratégica',  abbr:'CEE', color:'#F0C040', max:7 },
+  ];
+  const maxTotal  = Math.max(...districts.map(d=>d.total), 1);
+
+  // Banner de posición
+  const rc = myPos===1?'gold':myPos===2?'silver':myPos===3?'bronze':'';
+  const bannerHtml = myDist ? `
+    <div class="dist-rank-banner">
+      <div class="dist-rank-banner-label">MI POSICIÓN EN EL RANKING — ${pe}</div>
+      <div class="dist-rank-banner-pos ${rc}">#${myPos}</div>
+      <div class="dist-rank-banner-sub">de ${districts.length} distritos · ${myDist.total} pts</div>
+    </div>` : `
+    <div class="dist-rank-banner dist-rank-banner--warn">
+      <div class="dist-rank-banner-label">⚠ Sin distrito asignado</div>
+      <div class="dist-rank-banner-sub">Agrega el distrito en la hoja USUARIOS</div>
+    </div>`;
+
+  const rows = districts.map((d, i) => {
+    const pos   = i + 1;
+    const posRc = pos===1?'gold':pos===2?'silver':pos===3?'bronze':'';
+    const isMe  = d.distrito.toLowerCase() === myDistrito.toLowerCase();
+
+    if (isMe) {
+      const critBars = COMP.map(c => {
+        const val = d[c.key] ?? 0;
+        return `<div class="dm-crit-row">
+          <span class="dm-crit-abbr" style="color:${c.color}">${c.abbr}</span>
+          <div class="dm-crit-track"><div class="dm-crit-fill" style="width:${(val/c.max)*100}%;background:${c.color}"></div></div>
+          <span class="dm-crit-val" style="color:${c.color}">${val}</span>
+        </div>`;
+      }).join('');
+      return `<div class="dist-rk-card dist-rk-card--me">
+        <div class="dist-rk-head">
+          <div class="dist-rk-pos ${posRc}">#${pos}</div>
+          <div class="dist-rk-info">
+            <div class="dist-rk-name">${d.distrito} <span class="dm-you-tag">MI DISTRITO</span></div>
+            <div class="dist-rk-sub">Puntaje total del período</div>
+          </div>
+          <div class="dist-rk-score-block">
+            <div class="dist-rk-score" style="color:var(--blue)">${d.total}</div>
+            <div class="dist-rk-max">pts</div>
+          </div>
+        </div>
+        <div class="dm-crit-bars dist-rk-crit-section">${critBars}</div>
+      </div>`;
+    } else {
+      return `<div class="dist-rk-card dist-rk-card--locked">
+        <div class="dist-rk-head">
+          <div class="dist-rk-pos ${posRc}">#${pos}</div>
+          <div class="dist-rk-info">
+            <div class="dist-rk-name dist-rk-blur">Distrito confidencial</div>
+            <div class="dist-rk-sub dist-rk-blur">·· pts</div>
+          </div>
+          <div class="dist-rk-score-block">
+            <div class="dist-rk-score dist-rk-blur">●●●</div>
+          </div>
+        </div>
+        <div class="dist-rk-lock-msg">🔒 Información confidencial</div>
+      </div>`;
+    }
+  }).join('');
+
+  el.innerHTML = bannerHtml + `<div class="dist-rk-list">${rows}</div>`;
+}
+
 /* ── MI DISTRITO ── */
 function selectPERank(pe, btn) {
   rPE=pe;
@@ -183,26 +292,63 @@ function selectPERank(pe, btn) {
 }
 
 function renderDistrito(pe) {
-  renderDistStats(pe); renderMiembrosDistrito(pe);
+  renderCalificacionDistrito(pe);
+  renderDistStats(pe);
+  renderMiembrosDistrito(pe);
+}
+
+/* Calificación oficial del distrito desde CREATORS DISTRITOS - PEx */
+function renderCalificacionDistrito(pe) {
+  const el = document.getElementById('dist-cal-body'); if (!el) return;
+  if (!isSecretario()) return;
+  const distScores = D?.districtScores?.[pe] || [];
+  const myD = distScores.find(d => d.distrito.toLowerCase() === getMyDistrito().toLowerCase());
+  const COMP = D?.distCompetencias || [
+    { key:'cgo', label:'Gestión y Organización', abbr:'CGO', color:'#38BDF8', max:7 },
+    { key:'cct', label:'Creativa y Técnica',     abbr:'CCT', color:'#2ECC71', max:7 },
+    { key:'com', label:'Comunicativa',           abbr:'COM', color:'#C084FC', max:7 },
+    { key:'cee', label:'Ejecución Estratégica',  abbr:'CEE', color:'#F0C040', max:7 },
+  ];
+  if (!myD) {
+    el.innerHTML='<div style="font-size:.8rem;color:var(--muted);padding:8px 0">Sin calificación para este período en CREATORS DISTRITOS.</div>';
+    return;
+  }
+  const critBars = COMP.map(c => {
+    const val  = myD[c.key] ?? 0;
+    return `<div class="dist-cal-row">
+      <span class="dist-cal-abbr" style="color:${c.color}">${c.abbr}</span>
+      <div class="dist-cal-track"><div class="dist-cal-fill" style="width:${(val/c.max)*100}%;background:${c.color}"></div></div>
+      <span class="dist-cal-val" style="color:${c.color}">${val}</span>
+    </div>`;
+  }).join('');
+  el.innerHTML=`<div class="dist-cal-card">
+    <div class="dist-cal-head">
+      <div>
+        <div style="font-family:'Barlow Condensed',sans-serif;font-size:.6rem;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--muted)">Calificación oficial · Distrito ${myD.distrito} · ${pe}</div>
+        <div style="font-family:'Bebas Neue',sans-serif;font-size:2rem;line-height:1;color:var(--blue);margin-top:4px">${myD.total} <span style="font-size:.75rem;color:var(--muted)">pts</span></div>
+      </div>
+    </div>
+    <div class="dist-cal-bars">${critBars}</div>
+  </div>`;
 }
 
 function renderDistStats(pe) {
   const el=document.getElementById('dist-stats'); if(!el) return;
-  const rows=getDistritoRows(pe), myDistrito=getMyDistrito();
+  const rows=getDistritoRows(pe), myD=getMyDistrito();
   if (!rows.length) {
-    el.innerHTML=`<div style="grid-column:1/-1;padding:12px 0;font-size:.8rem;color:var(--muted)">No hay miembros en <strong style="color:var(--txt)">${myDistrito||'tu distrito'}</strong> para ${pe}.</div>`;
+    el.innerHTML=`<div style="grid-column:1/-1;padding:12px 0;font-size:.8rem;color:var(--muted)">No hay miembros en <strong style="color:var(--txt)">${myD||'tu distrito'}</strong> para ${pe}.</div>`;
     return;
   }
   const scores=rows.map(calcScore), total=rows.length;
   const avg=(scores.reduce((a,b)=>a+b,0)/total).toFixed(1);
-  const maxS=Math.max(...scores), topR=rows.find(r=>calcScore(r)===maxS);
   const myRow=rows.find(r=>r.usuario===CU.user), myS=myRow?calcScore(myRow):null;
   const myPos=myS!==null?[...rows].sort((a,b)=>calcScore(b)-calcScore(a)).findIndex(r=>r.usuario===CU.user)+1:null;
+  const maxS=Math.max(...scores), topR=rows.find(r=>calcScore(r)===maxS);
   el.innerHTML=[
-    {lbl:'Miembros en el distrito', val:total,              sub:myDistrito||pe,         col:''},
-    {lbl:'Promedio del distrito',   val:avg,                sub:`/ ${MAX_TOTAL()} pts`, col:scoreColor(parseFloat(avg))},
-    {lbl:'Mi posición',             val:myPos?`#${myPos}`:'—', sub:`de ${total} miembros`,col:'var(--blue)'},
-    {lbl:'Puntaje más alto',        val:maxS,               sub:topR?.nombre||'—',      col:'var(--sex)'},
+    {lbl:'Miembros en el distrito', val:total,               sub:myD||pe,            col:''},
+    {lbl:'Promedio del distrito',   val:avg,                 sub:`/ ${MAX_TOTAL()} pts`, col:scoreColor(parseFloat(avg))},
+    {lbl:'Mi posición',             val:myPos?`#${myPos}`:'—', sub:`de ${total} miembros`, col:'var(--blue)'},
+    {lbl:'Puntaje más alto',        val:maxS,                sub:topR?.nombre||'—',  col:'var(--sex)'},
   ].map(s=>`<div class="dist-scard"><div class="dist-scard-lbl">${s.lbl}</div><div class="dist-scard-val"${s.col?` style="color:${s.col}"`:''}>${s.val}</div><div class="dist-scard-sub">${s.sub}</div></div>`).join('');
 }
 
@@ -210,7 +356,7 @@ function renderMiembrosDistrito(pe) {
   const el=document.getElementById('distrito-members'); if(!el) return;
   const rows=getDistritoRows(pe), fbs=D?.feedback?.[pe]||[], criterios=getCriterios();
   if (!rows.length) {
-    el.innerHTML=`<div class="empty-box"><div class="empty-icon">👥</div><div class="empty-txt">No hay miembros en tu distrito para ${pe}.<br>Verifica que la columna C (Distrito) en CREATORS SCORE coincida con el nombre configurado en DISTRICT_KEYS.</div></div>`;
+    el.innerHTML=`<div class="empty-box"><div class="empty-icon">👥</div><div class="empty-txt">No hay miembros en tu distrito para ${pe}.</div></div>`;
     return;
   }
   const sorted=[...rows].sort((a,b)=>calcScore(b)-calcScore(a));
@@ -221,14 +367,14 @@ function renderMiembrosDistrito(pe) {
       const val=r[c.key]||0;
       return `<div class="dm-crit-row"><span class="dm-crit-abbr" style="color:${c.color}">${c.abbr}</span><div class="dm-crit-track"><div class="dm-crit-fill" style="width:${(val/4)*100}%;background:${c.color}"></div></div><span class="dm-crit-val" style="color:${c.color}">${val}</span></div>`;
     }).join('');
-    const hasFb = myFb && criterios.some(c=>myFb[c.key]);
+    const hasFb=myFb&&criterios.some(c=>myFb[c.key]);
     return `<div class="dm-card${isMe?' dm-card--me':''}">
       <div class="dm-card-head">
         <div class="dm-rank ${rc}">#${pos}</div>
         <div class="dm-avatar">${initials(r.nombre||r.usuario)}</div>
         <div class="dm-info">
           <div class="dm-name">${r.nombre||r.usuario}${isMe?'<span class="dm-you-tag">YO</span>':''}</div>
-          <div class="dm-role">${r.rol||'Miembro'}${r.area?' · '+r.area:''}</div>
+          <div class="dm-role">${r.rol||'Creator'}${r.area?' · '+r.area:''}</div>
         </div>
         <div class="dm-score-block">
           <div class="dm-score-total" style="color:${scoreColor(s)}">${s}</div>
@@ -239,32 +385,6 @@ function renderMiembrosDistrito(pe) {
       </div>
       <div class="dm-crit-bars">${critBars}</div>
       ${hasFb?`<details class="dm-feedback"><summary>Ver retroalimentación</summary><div class="dm-feedback-body">${criterios.map(c=>myFb[c.key]?`<div class="dm-fb-row"><span style="color:${c.color};font-weight:700;font-size:.65rem;letter-spacing:1px">${c.abbr}</span><span>${myFb[c.key]}</span></div>`:'').join('')}</div></details>`:''}
-    </div>`;
-  }).join('')}</div>`;
-}
-
-/* ── CRITERIOS ── */
-function selectPECrit(pe, btn) {
-  cPE=pe;
-  document.querySelectorAll('#tab-criterios .pe-row .pb').forEach(b=>b.classList.remove('active'));
-  btn.classList.add('active'); renderCriterios(pe);
-}
-
-function renderCriterios(pe) {
-  const el=document.getElementById('criterios-body'); if(!el) return;
-  const criterios=getCriterios(), rows=getDistritoRows(pe), total=rows.length;
-  const myRow=rows.find(r=>r.usuario===CU.user);
-  if (!total) { el.innerHTML='<div class="empty-box"><div class="empty-icon">📈</div><div class="empty-txt">Sin datos para este período en tu distrito</div></div>'; return; }
-  el.innerHTML=`<div class="crit-overview-grid">${criterios.map(c=>{
-    const avg=total?(rows.reduce((s,r)=>s+(r[c.key]||0),0)/total).toFixed(2):0;
-    const myVal=myRow?(myRow[c.key]||0):null, diff=myVal!==null?myVal-parseFloat(avg):null;
-    return `<div class="crit-ov-card">
-      <div class="crit-ov-header"><div class="crit-ov-dot" style="background:${c.color}"></div><div class="crit-ov-name" style="color:${c.color}">${c.label}</div>${myVal!==null?`<div class="crit-ov-avg" style="color:${c.color}">${myVal}<span style="font-size:.75rem;color:var(--muted)">/4</span></div>`:''}</div>
-      <div class="crit-compare">
-        ${myVal!==null?`<div class="crit-compare-row"><div class="crit-compare-label"><span>Mi puntaje</span><span>${myVal}/4</span></div><div class="crit-compare-track"><div class="crit-compare-fill" style="width:${(myVal/4)*100}%;background:${c.color};box-shadow:0 0 8px ${c.color}60"></div></div></div>`:''}
-        <div class="crit-compare-row"><div class="crit-compare-label"><span>Promedio del distrito</span><span>${avg}/4</span></div><div class="crit-compare-track"><div class="crit-compare-fill" style="width:${(parseFloat(avg)/4)*100}%;background:rgba(255,255,255,.25)"></div></div></div>
-      </div>
-      ${diff!==null?(diff>0.5?`<div style="margin-top:10px;font-size:.7rem;color:var(--green);font-family:'Barlow Condensed',sans-serif;font-weight:700;letter-spacing:1px">▲ ${diff.toFixed(2)} por encima del promedio</div>`:diff<-0.5?`<div style="margin-top:10px;font-size:.7rem;color:var(--red);font-family:'Barlow Condensed',sans-serif;font-weight:700;letter-spacing:1px">▼ ${Math.abs(diff).toFixed(2)} por debajo del promedio</div>`:`<div style="margin-top:10px;font-size:.7rem;color:var(--muted);font-family:'Barlow Condensed',sans-serif;letter-spacing:1px">▬ En línea con el promedio</div>`):''}
     </div>`;
   }).join('')}</div>`;
 }
@@ -296,7 +416,7 @@ async function handleRefresh() {
   if(btn){btn.classList.add('refreshing');btn.disabled=true;}
   showToast('Actualizando...','info');
   await loadData(); renderDistritoHeader();
-  renderMyScore(mPE); renderDistrito(rPE); renderCriterios(cPE);
+  renderMyScore(mPE); renderRankingDistritos(dPE); renderDistrito(rPE);
   renderRubrica(); renderCalendario(); updateTimestamp();
   if(btn){btn.classList.remove('refreshing');btn.disabled=false;}
   showToast('Datos actualizados ✓','ok');
@@ -307,22 +427,30 @@ const calcScore  = row => getCriterios().reduce((s,c)=>s+(row[c.key]||0),0)+(row
 const scoreColor = s => s>=26?'var(--sex)':s>=20?'var(--sbu)':s>=11?'var(--spr)':'var(--sba)';
 const scoreLabel = s => s>=26?'Excelente':s>=20?'Bueno':s>=11?'En Proceso':'Bajo';
 const scoreClass = s => s>=26?'sex':s>=20?'sbu':s>=11?'spr':'sba';
-const initials   = n => n.split(' ').map(w=>w[0]).slice(0,2).join('').toUpperCase();
+const initials   = n => String(n||'').split(' ').map(w=>w[0]).slice(0,2).join('').toUpperCase()||'?';
 const setEl      = (id,txt) => { const el=document.getElementById(id); if(el) el.textContent=txt; };
 const pad        = n => String(n).padStart(2,'0');
 
-function switchTab(tab,btn) {
+/* ── TABS ── */
+function switchTab(tab, btn) {
   document.querySelectorAll('.tab-content').forEach(t=>t.classList.remove('active'));
   document.getElementById(`tab-${tab}`)?.classList.add('active');
   document.querySelectorAll('#desktop-nav .tnav').forEach(b=>b.classList.remove('active'));
   btn?.classList.add('active');
 }
-function switchTabMobile(tab,btn) {
-  switchTab(tab,null);
+function switchTabMobile(tab, btn) {
+  document.querySelectorAll('.tab-content').forEach(t=>t.classList.remove('active'));
+  document.getElementById(`tab-${tab}`)?.classList.add('active');
   document.querySelectorAll('.mobile-menu .mobile-nav-btn').forEach(b=>b.classList.remove('active'));
   btn?.classList.add('active'); closeMenu();
-  const tabs=['miscore','distrito','criterios','rubrica','cal'],idx=tabs.indexOf(tab);
-  document.querySelectorAll('#desktop-nav .tnav').forEach((b,i)=>b.classList.toggle('active',i===idx));
+  // Sincronizar desktop nav
+  const allTabs=['miscore','ranking','distrito','rubrica','cal'];
+  const idx=allTabs.indexOf(tab);
+  const visibleBtns=[...document.querySelectorAll('#desktop-nav .tnav')].filter(b=>b.style.display!=='none');
+  const visibleTabs=allTabs.filter((t,i)=>{ const b=document.querySelectorAll('#desktop-nav .tnav')[i]; return !b||b.style.display!=='none'; });
+  document.querySelectorAll('#desktop-nav .tnav').forEach(b=>b.classList.remove('active'));
+  const deskBtn=[...document.querySelectorAll('#desktop-nav .tnav')].find(b=>b.getAttribute('onclick')?.includes(`'${tab}'`));
+  if(deskBtn) deskBtn.classList.add('active');
 }
 function toggleMenu() {
   _menuOpen=!_menuOpen;
@@ -341,7 +469,7 @@ function closeMenu() {
 document.addEventListener('click',e=>{const menu=document.getElementById('mobile-menu'),ham=document.getElementById('hamburger');if(menu?.classList.contains('open')&&!menu.contains(e.target)&&!ham?.contains(e.target))closeMenu();});
 window.addEventListener('resize',()=>{if(window.innerWidth>720)closeMenu();});
 function updateTimestamp() {
-  if(!_lastUpdated) return;
+  if(!_lastUpdated)return;
   const t=_lastUpdated,txt=`✓ ${pad(t.getHours())}:${pad(t.getMinutes())}:${pad(t.getSeconds())}`;
   ['ts-badge','ts-badge-mob'].forEach(id=>{const el=document.getElementById(id);if(!el)return;el.textContent=txt;el.classList.add('flash');setTimeout(()=>el.classList.remove('flash'),1000);});
 }

@@ -4,6 +4,7 @@
 'use strict';
 
 let CU=null, D=null, aPE='PE1', aMember=null, _arTimer=null, _lastUpdated=null, _menuOpen=false;
+let _evalMode='creators', _pendingDistScores={};
 let _pendingScores={}, _pendingFeedback={};
 
 const CRITERIOS_DEFAULT = [
@@ -48,8 +49,9 @@ function renderAll() {
   if (!D) return;
   const rows = D.scores?.[aPE] || [];
   renderOverview(rows); renderRanking(rows); renderCriterios(rows);
+  renderDistritosAdmin(rows);
   renderMemberChips(); if (aMember) renderMemberDetail(aMember);
-  renderRubrica(); renderDebug(); updateTimestamp();
+  renderRubrica(); renderCalendarioAdmin(); renderDebug(); updateTimestamp();
 }
 
 /* ── OVERVIEW ── */
@@ -309,7 +311,398 @@ function renderRubrica() {
   }).join('');
 }
 
-/* ── DEBUG ── */
+/* ── DISTRITOS ADMIN ── */
+function renderDistritosAdmin(rows) {
+  setEl('dist-admin-pe', aPE);
+
+  // Usar los puntajes de distrito directamente del Sheet (filas 23+)
+  const distScores = D?.districtScores?.[aPE] || [];
+
+  // Agrupar miembros por distrito para las cards expandibles
+  const memberMap = {};
+  rows.forEach(r => {
+    const dist = String(r.distrito || '').trim();
+    if (!dist) return;
+    if (!memberMap[dist]) memberMap[dist] = [];
+    memberMap[dist].push(r);
+  });
+
+  // Construir lista usando los puntajes oficiales del sheet
+  const districts = distScores.map(d => ({
+    dist:    d.distrito,
+    members: memberMap[d.distrito] || [],
+    avg:     d.total,
+    totalScore: d.total,
+    distData: d,
+  }));
+
+  // Stat cards resumen de distritos
+  const statsEl = document.getElementById('dist-admin-stats');
+  if (statsEl && districts.length) {
+    const topDist     = districts[0];
+    const totalMembers = districts.reduce((s,d)=>s+d.members.length,0);
+    const globalAvg    = districts.length ? (districts.reduce((s,d)=>s+d.avg,0)/districts.length).toFixed(1) : '—';
+    statsEl.innerHTML = [
+      {lbl:'Distritos activos',  val:districts.length,      sub:`${aPE}`,                  col:''},
+      {lbl:'Total miembros',     val:totalMembers,           sub:'todos los distritos',     col:''},
+      {lbl:'Promedio global',    val:globalAvg,              sub:`/ ${MAX_TOTAL()} pts`,    col:scoreColor(parseFloat(globalAvg))},
+      {lbl:'Distrito líder',     val:`#1`,                   sub:topDist?.dist||'—',        col:'var(--sex)'},
+    ].map(s=>`<div class="scard"><div class="sc-lbl">${s.lbl}</div><div class="sc-val"${s.col?` style="color:${s.col}"`:''}>${s.val}</div><div class="sc-sub">${s.sub}</div></div>`).join('');
+  }
+
+  // Lista de distritos
+  const listEl = document.getElementById('dist-admin-list');
+  if (!listEl) return;
+
+  if (!districts.length) {
+    listEl.innerHTML = '<div class="empty-box"><div class="empty-icon">🗺️</div><div class="empty-txt">Sin datos de distritos para este período.</div></div>';
+    return;
+  }
+
+  const criterios = getCriterios();
+  listEl.innerHTML = districts.map((d, i) => {
+    const pos   = i + 1;
+    const posRc = pos===1?'gold':pos===2?'silver':pos===3?'bronze':'';
+    const distId = esc(d.dist);
+
+    // Barras de puntaje por criterio (desde datos oficiales del sheet)
+    const critBars = criterios.map(c => {
+      const cAvg = d.distData ? (d.distData[c.key] ?? 0) :
+        (d.members.length ? (d.members.reduce((s,r)=>s+(r[c.key]||0),0)/d.members.length).toFixed(2) : 0);
+      return `<div class="cs-row">
+        <div class="cs-lbl" style="color:${c.color}">${c.abbr}</div>
+        <div class="cs-track"><div class="cs-fill" style="width:${(cAvg/4)*100}%;background:${c.color}"></div></div>
+        <div class="cs-val" style="color:${c.color}">${cAvg}</div>
+      </div>`;
+    }).join('');
+
+    // Lista de miembros del distrito
+    const membersSorted = [...d.members].sort((a,b)=>calcScore(b)-calcScore(a));
+    const memberRows = membersSorted.map((m, mi) => {
+      const s   = calcScore(m);
+      const mRc = mi===0?'gold':mi===1?'silver':mi===2?'bronze':'';
+      return `<div class="admin-dist-member-row">
+        <span class="rank-num ${mRc}" style="font-family:'Bebas Neue',sans-serif;font-size:.9rem;width:22px;flex-shrink:0">#${mi+1}</span>
+        <div style="flex:1;min-width:90px">
+          <div style="font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:.82rem">${m.nombre||m.usuario}</div>
+          <div style="font-size:.6rem;color:var(--muted)">${m.rol||''}${m.area?' · '+m.area:''}</div>
+        </div>
+        <span class="sbadge ${scoreClass(s)}">${s}</span>
+        <button class="admin-dist-edit-btn" onclick="goToMemberFromDistrict('${esc(m.usuario)}')">✏️ Editar</button>
+      </div>`;
+    }).join('');
+
+    return `<div class="admin-dist-card" id="adc-${distId}">
+      <div class="admin-dist-head" onclick="toggleDistAdmin('${distId}')">
+        <div class="dist-rk-pos-admin ${posRc}">#${pos}</div>
+        <div style="flex:1;min-width:100px">
+          <div style="font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:1.05rem;letter-spacing:1px">${d.dist}</div>
+          <div style="font-size:.65rem;color:var(--muted)">${d.members.length} miembros</div>
+        </div>
+        <div style="text-align:right;margin-right:14px">
+          <div style="font-family:'Bebas Neue',sans-serif;font-size:1.9rem;line-height:1;color:${scoreColor(d.avg)}">${d.avg.toFixed(1)}</div>
+          <div style="font-size:.6rem;color:var(--muted)">promedio / ${MAX_TOTAL()}</div>
+          <span class="nivel-badge ${scoreClass(Math.round(d.avg))}" style="font-size:.5rem;padding:2px 6px">${scoreLabel(Math.round(d.avg))}</span>
+        </div>
+        <span class="admin-dist-chev" id="chev-${distId}">▾</span>
+      </div>
+      <div class="admin-dist-body" id="adb-${distId}" style="display:none">
+        <div class="admin-dist-expand-grid">
+          <div>
+            <div class="section-label" style="margin-bottom:10px">Promedio por criterio</div>
+            <div class="crit-summary-grid">${critBars}</div>
+          </div>
+          <div>
+            <div class="section-label" style="margin-bottom:10px">
+              Miembros del distrito
+              <span style="font-size:.6rem;color:var(--muted);font-family:'Barlow',sans-serif;letter-spacing:0;text-transform:none;font-weight:400;margin-left:6px">Haz clic en ✏️ Editar para modificar scores</span>
+            </div>
+            <div class="admin-dist-members-list">${memberRows}</div>
+          </div>
+        </div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function toggleDistAdmin(distId) {
+  const body = document.getElementById(`adb-${distId}`);
+  const chev = document.getElementById(`chev-${distId}`);
+  if (!body) return;
+  const isOpen = body.style.display !== 'none';
+  body.style.display = isOpen ? 'none' : 'block';
+  if (chev) chev.style.transform = isOpen ? '' : 'rotate(180deg)';
+}
+
+function goToMemberFromDistrict(usuario) {
+  // Navegar a la pestaña Miembros y seleccionar este miembro
+  const miembrosBtn = document.querySelector('#desktop-nav .tnav:nth-child(5)');
+  switchTab('miembros', miembrosBtn);
+  selectMember(usuario);
+}
+
+
+/* ── MODO EVALUACIÓN: CREATORS / DISTRITOS ── */
+function setEvalMode(mode) {
+  _evalMode = mode;
+  _pendingDistScores = {};
+  document.getElementById('etb-creators')?.classList.toggle('active', mode==='creators');
+  document.getElementById('etb-distritos')?.classList.toggle('active', mode==='distritos');
+  document.getElementById('eval-creators-panel').style.display = mode==='creators' ? '' : 'none';
+  document.getElementById('eval-distritos-panel').style.display = mode==='distritos' ? '' : 'none';
+  if (mode==='distritos') renderDistrictEditor();
+}
+
+function renderDistrictEditor() {
+  const el = document.getElementById('district-editor'); if (!el) return;
+  const COMP = D?.distCompetencias || [
+    { key:'cgo', label:'Gestión y Organización "CGO"', abbr:'CGO', color:'#38BDF8', max:4 },
+    { key:'cct', label:'Creativa y Técnica "CCT"',     abbr:'CCT', color:'#2ECC71', max:4 },
+    { key:'com', label:'Comunicativa "COM"',            abbr:'COM', color:'#C084FC', max:4 },
+    { key:'cee', label:'Ejecución Estratégica "CEE"',  abbr:'CEE', color:'#F0C040', max:4 },
+  ];
+  const distScores = D?.districtScores?.[aPE] || [];
+
+  if (!distScores.length) {
+    el.innerHTML = `<div class="empty-box"><div class="empty-icon">🗺️</div><div class="empty-txt">Sin datos para ${aPE}.<br>Verifica que exista la hoja "CREATORS DISTRITOS - ${aPE}".</div></div>`;
+    return;
+  }
+
+  const cards = distScores.map(d => {
+    const distId = esc(d.distrito);
+    const compRows = COMP.map(c => {
+      const val = d[c.key] ?? 0;
+      const id  = `dci-${distId}-${c.key}`;
+      return `<div class="dist-comp-row">
+        <div class="dist-comp-info">
+          <div class="dist-comp-name" style="color:${c.color}">${c.abbr}</div>
+          <div class="dist-comp-abbr">${c.label}</div>
+        </div>
+        <div class="dist-comp-track"><div class="dist-comp-fill" id="df-${distId}-${c.key}" style="width:${(val/c.max)*100}%;background:${c.color}"></div></div>
+        <input type="number" class="dist-comp-inp" id="${id}"
+          data-distrito="${esc(d.distrito)}" data-competencia="${c.key}"
+          data-original="${val}" value="${val}"
+          min="0" max="${c.max}" step="1"
+          onchange="onDistScoreChange(this)" oninput="onDistScoreChange(this)">
+      </div>`;
+    }).join('');
+
+    return `<div class="dist-editor-card" id="dec-${distId}">
+      <div class="dist-editor-head">
+        <div class="dist-editor-name">${d.distrito}</div>
+        <div style="text-align:right">
+          <div class="dist-editor-total" id="det-${distId}">${d.total}</div>
+          <div class="dist-editor-total-lbl">Total</div>
+        </div>
+      </div>
+      <div class="dist-editor-body">${compRows}</div>
+      <div class="save-bar hidden" id="dsb-${distId}" style="margin:0 0 4px">
+        <span class="save-bar-msg">⚠ Cambios sin guardar</span>
+        <button class="btn-cancel-changes" onclick="cancelDistChanges('${esc(d.distrito)}')">Cancelar</button>
+        <button class="btn-save" id="dsave-${distId}" onclick="saveDistScores('${esc(d.distrito)}')">Guardar</button>
+      </div>
+    </div>`;
+  }).join('');
+
+  el.innerHTML = `<div class="dist-editor-grid">${cards}</div>`;
+}
+
+function onDistScoreChange(inp) {
+  const { distrito, competencia } = inp.dataset;
+  const distId = esc(distrito);
+  const COMP = D?.distCompetencias || [{key:'cgo',max:4},{key:'cct',max:4},{key:'com',max:4},{key:'cee',max:4}];
+  const maxV = (COMP.find(c=>c.key===competencia)||{max:4}).max;
+  const val  = Math.min(maxV, Math.max(0, parseInt(inp.value)||0));
+  inp.value  = val;
+  const orig = parseFloat(inp.dataset.original)||0;
+  const key  = `${aPE}_${distrito}_${competencia}`;
+  inp.classList.toggle('changed', val!==orig);
+  const fill = document.getElementById(`df-${distId}-${competencia}`);
+  if (fill) fill.style.width = `${(val/maxV)*100}%`;
+  if (val!==orig) _pendingDistScores[key]=val; else delete _pendingDistScores[key];
+  // Recalcular total en vivo
+  let total = 0;
+  COMP.forEach(c => { const e = document.getElementById(`dci-${distId}-${c.key}`); if(e) total += parseInt(e.value)||0; });
+  const totEl = document.getElementById(`det-${distId}`);
+  if (totEl) totEl.textContent = total;
+  showSaveBar(`dsb-${distId}`, Object.keys(_pendingDistScores).some(k=>k.startsWith(`${aPE}_${distrito}_`)));
+}
+
+function cancelDistChanges(distrito) {
+  const distId = esc(distrito);
+  const COMP = D?.distCompetencias || [{key:'cgo',max:4},{key:'cct',max:4},{key:'com',max:4},{key:'cee',max:4}];
+  COMP.forEach(c => {
+    const inp = document.getElementById(`dci-${distId}-${c.key}`); if(!inp) return;
+    inp.value = inp.dataset.original; inp.classList.remove('changed');
+    const fill = document.getElementById(`df-${distId}-${c.key}`);
+    if (fill) fill.style.width = `${((parseFloat(inp.dataset.original)||0)/c.max)*100}%`;
+    delete _pendingDistScores[`${aPE}_${distrito}_${c.key}`];
+  });
+  const d = D?.districtScores?.[aPE]?.find(x=>x.distrito===distrito);
+  const totEl = document.getElementById(`det-${distId}`);
+  if (totEl && d) totEl.textContent = d.total;
+  showSaveBar(`dsb-${distId}`, false);
+}
+
+async function saveDistScores(distrito) {
+  const distId = esc(distrito);
+  const btn    = document.getElementById(`dsave-${distId}`);
+  if (btn) { btn.textContent='Guardando...'; btn.classList.add('saving'); }
+  try {
+    const changes = Object.entries(_pendingDistScores)
+      .filter(([k])=>k.startsWith(`${aPE}_${distrito}_`))
+      .map(([k,v])=>({ pe:aPE, distrito, competencia:k.split('_')[2], valor:v }));
+    if (!changes.length) { showToast('Sin cambios','info'); return; }
+    const r = await API.updateBulkDistrictScores(changes);
+    if (!r.ok) { showToast(`Error: ${r.failed?.length||0} fallaron`,'error'); }
+    else {
+      showToast(`✓ Distrito ${distrito} guardado`,'ok');
+      changes.forEach(c => {
+        const inp = document.getElementById(`dci-${distId}-${c.competencia}`);
+        if (inp) { inp.dataset.original = c.valor; inp.classList.remove('changed'); }
+        delete _pendingDistScores[`${c.pe}_${distrito}_${c.competencia}`];
+      });
+      showSaveBar(`dsb-${distId}`, false);
+      await loadData(); renderDistrictEditor();
+    }
+  } catch(e){ showToast('Error al guardar','error'); console.error(e); }
+  finally { if(btn){btn.textContent='Guardar';btn.classList.remove('saving');} }
+}
+
+/* ─────────────────────────────────────────────────────────────
+   CALENDARIO EDITABLE — Admin
+   ───────────────────────────────────────────────────────────── */
+
+// 8 colores disponibles para etiquetas
+const CAL_COLORS = [
+  { key:'rojo',      label:'Rojo',      hex:'#E05A6A' },
+  { key:'verde',     label:'Verde',     hex:'#2ECC71' },
+  { key:'azul',      label:'Azul',      hex:'#38BDF8' },
+  { key:'amarillo',  label:'Amarillo',  hex:'#F0C040' },
+  { key:'morado',    label:'Morado',    hex:'#C084FC' },
+  { key:'naranja',   label:'Naranja',   hex:'#FB923C' },
+  { key:'rosa',      label:'Rosa',      hex:'#F472B6' },
+  { key:'gris',      label:'Gris',      hex:'#94A3B8' },
+];
+
+const CAL_ESTADOS = ['Pendiente','En curso','Próximo','Completado'];
+
+let _calEventos = [];  // copia editable de los eventos
+let _calDirty   = false;
+
+function renderCalendarioAdmin() {
+  // Clonar datos del servidor para editar localmente
+  _calEventos = (D?.calendario || []).map(e => Object.assign({}, e));
+  _calDirty   = false;
+  updateCalSaveBtn();
+  renderCalEditorList();
+}
+
+function renderCalEditorList() {
+  const el = document.getElementById('cal-editor-list'); if (!el) return;
+  if (!_calEventos.length) {
+    el.innerHTML = '<div class="empty-box"><div class="empty-icon">📅</div><div class="empty-txt">Sin actividades. Haz clic en "+ Agregar actividad" para crear la primera.</div></div>';
+    return;
+  }
+
+  el.innerHTML = _calEventos.map((ev, i) => {
+    const col = CAL_COLORS.find(c => c.key === ev.color) || CAL_COLORS[0];
+    const colorOpts = CAL_COLORS.map(c =>
+      `<option value="${c.key}" ${c.key===ev.color?'selected':''}>${c.label}</option>`
+    ).join('');
+    const estadoOpts = CAL_ESTADOS.map(s =>
+      `<option value="${s}" ${s===ev.estado?'selected':''}>${s}</option>`
+    ).join('');
+
+    return `<div class="cal-ev-card" id="cev-${i}" style="border-left:3px solid ${col.hex}">
+      <div class="cal-ev-head">
+        <div class="cal-ev-num">
+          <span style="font-family:'Barlow Condensed',sans-serif;font-size:.58rem;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--muted)">N°</span>
+          <input type="number" class="cal-inp cal-inp--num" value="${ev.numero||i+1}" min="1"
+            onchange="updateCalEvento(${i},'numero',this.value)" oninput="markCalDirty()">
+        </div>
+        <div class="cal-ev-color-dot" style="background:${col.hex};width:10px;height:10px;border-radius:50%;flex-shrink:0"></div>
+        <input type="text" class="cal-inp cal-inp--title" value="${esc(ev.titulo||'')}" placeholder="Título del período..."
+          onchange="updateCalEvento(${i},'titulo',this.value)" oninput="markCalDirty()">
+        <select class="cal-inp cal-inp--color" onchange="updateCalColor(${i},this.value)" style="border-color:${col.hex}">
+          ${colorOpts}
+        </select>
+        <select class="cal-inp cal-inp--estado" onchange="updateCalEvento(${i},'estado',this.value)">
+          ${estadoOpts}
+        </select>
+        <button class="cal-ev-delete" onclick="deleteCalEvento(${i})" title="Eliminar">✕</button>
+      </div>
+      <div class="cal-ev-dates">
+        ${[['inicio','Inicio'],['finTrabajo','Fin de trabajo'],['entrega','Entrega scores'],['jornada','Jornada']].map(([field,lbl])=>`
+          <div class="cal-date-field">
+            <label class="cal-date-lbl">${lbl}</label>
+            <input type="text" class="cal-inp cal-inp--date" value="${esc(ev[field]||'')}" placeholder="d/m/aaaa"
+              onchange="updateCalEvento(${i},'${field}',this.value)" oninput="markCalDirty()">
+          </div>`).join('')}
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function updateCalEvento(idx, field, value) {
+  if (_calEventos[idx]) { _calEventos[idx][field] = value; markCalDirty(); }
+}
+
+function updateCalColor(idx, colorKey) {
+  updateCalEvento(idx, 'color', colorKey);
+  // Actualizar visualmente el dot y el borde sin re-render completo
+  const col = CAL_COLORS.find(c=>c.key===colorKey)||CAL_COLORS[0];
+  const card = document.getElementById(`cev-${idx}`);
+  if (card) {
+    card.style.borderLeftColor = col.hex;
+    const dot = card.querySelector('.cal-ev-color-dot');
+    if (dot) dot.style.background = col.hex;
+    const sel = card.querySelector('.cal-inp--color');
+    if (sel) sel.style.borderColor = col.hex;
+  }
+}
+
+function markCalDirty() {
+  _calDirty = true;
+  updateCalSaveBtn();
+}
+
+function updateCalSaveBtn() {
+  const btn = document.getElementById('btn-save-cal');
+  if (btn) btn.classList.toggle('hidden', !_calDirty);
+}
+
+function addCalEvento() {
+  _calEventos.push({ numero:_calEventos.length+1, titulo:'', color:'rojo', inicio:'', finTrabajo:'', entrega:'', jornada:'', estado:'Pendiente' });
+  markCalDirty();
+  renderCalEditorList();
+  // Scroll al final
+  setTimeout(()=>{ const l=document.getElementById('cal-editor-list'); if(l) l.lastElementChild?.scrollIntoView({behavior:'smooth',block:'nearest'}); },100);
+}
+
+function deleteCalEvento(idx) {
+  _calEventos.splice(idx, 1);
+  markCalDirty();
+  renderCalEditorList();
+}
+
+async function saveCalendarioAdmin() {
+  const btn = document.getElementById('btn-save-cal');
+  if (btn) { btn.textContent='Guardando...'; btn.classList.add('saving'); }
+  try {
+    const r = await API.saveCalendario(_calEventos);
+    if (!r.ok) { showToast('Error al guardar: '+(r.error||''),'error'); }
+    else {
+      showToast(`✓ Calendario guardado (${r.saved} eventos)`,'ok');
+      _calDirty = false;
+      updateCalSaveBtn();
+      await loadData();
+      renderCalendarioAdmin();
+    }
+  } catch(e) { showToast('Error al guardar','error'); console.error(e); }
+  finally { if(btn){ btn.innerHTML='<svg viewBox="0 0 16 16" width="14" height="14" fill="none"><path d="M13.5 4.5L6 12 2.5 8.5" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg> Guardar calendario'; btn.classList.remove('saving'); } }
+}
+
 function renderDebug() {
   const el=document.getElementById('debug-content'); if(!el) return;
   const criterios=getCriterios(), isDefault=!(D?.criterios?.length);
@@ -349,7 +742,7 @@ function switchTabMobile(tab, btn) {
   document.getElementById(`tab-${tab}`)?.classList.add('active');
   document.querySelectorAll('.mobile-menu .mobile-nav-btn').forEach(b=>b.classList.remove('active'));
   btn?.classList.add('active'); closeMenu();
-  const tabs=['overview','ranking','criterios','miembros','rubrica','debug'], idx=tabs.indexOf(tab);
+  const tabs=['overview','ranking','criterios','distritos','miembros','rubrica','calendario','debug'], idx=tabs.indexOf(tab);
   document.querySelectorAll('#desktop-nav .tnav').forEach((b,i)=>b.classList.toggle('active',i===idx));
 }
 function goToMember(usuario) { switchTab('miembros', document.querySelector('#desktop-nav .tnav:nth-child(4)')); selectMember(usuario); }

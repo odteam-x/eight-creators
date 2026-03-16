@@ -1,8 +1,5 @@
 /**
  * EIGHT CREATORS LABs — Capa de API
- * ─────────────────────────────────
- * Toda comunicación con el backend pasa por aquí.
- * Ninguna URL ni referencia al origen se expone en la UI.
  */
 const API = (() => {
   async function call(action, params = {}) {
@@ -23,9 +20,20 @@ const API = (() => {
   }
 
   return {
-    getData:         ()                           => call('getData'),
-    updateScore:     (pe, usuario, criterio, val) => call('updateScore',    { pe, usuario, criterio, valor: val }),
-    updateFeedback:  (pe, usuario, criterio, txt) => call('updateFeedback', { pe, usuario, criterio, texto: txt }),
-    updateBulkScores:(changes)                    => call('updateBulkScores', { changes: JSON.stringify(changes) }),
+    // Auth
+    login:                   (u, p)                              => call('login',                   { usuario:u, pass:p }),
+    // Datos
+    getData:                 ()                                   => call('getData'),
+    getSecretarioData:       (usuario)                            => call('getSecretarioData',       { usuario }),
+    getDistrictRanking:      (pe)                                 => call('getDistrictRanking',       { pe }),
+    // Scores de miembros
+    updateScore:             (pe, usuario, criterio, val)         => call('updateScore',             { pe, usuario, criterio, valor:val }),
+    updateFeedback:          (pe, usuario, criterio, txt)         => call('updateFeedback',           { pe, usuario, criterio, texto:txt }),
+    updateBulkScores:        (changes)                            => call('updateBulkScores',         { changes:JSON.stringify(changes) }),
+    // Scores de distritos (sin feedback)
+    updateDistrictScore:     (pe, distrito, competencia, val)     => call('updateDistrictScore',     { pe, distrito, competencia, valor:val }),
+    updateBulkDistrictScores:(changes)                            => call('updateBulkDistrictScores', { changes:JSON.stringify(changes) }),
+    // Calendario
+    saveCalendario:          (eventos)                             => call('saveCalendario',          { eventos:JSON.stringify(eventos) }),
   };
 })();
