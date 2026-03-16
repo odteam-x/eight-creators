@@ -132,6 +132,17 @@
   <!-- MIEMBROS / DISTRITOS (con toggle) -->
   <div id="tab-miembros" class="atab-content">
     <div class="ptitle">EVALUACIÓN</div>
+
+    <!-- PE Selector dentro del tab -->
+    <div class="eval-pe-bar">
+      <span class="eval-pe-lbl">Período:</span>
+      <div class="eval-pe-btns" id="eval-pe-btns">
+        <button class="pb active" onclick="selectEvalPE('PE1',this)">PE1</button>
+        <button class="pb"        onclick="selectEvalPE('PE2',this)">PE2</button>
+        <button class="pb"        onclick="selectEvalPE('PE3',this)">PE3</button>
+      </div>
+    </div>
+
     <!-- Toggle Creators / Distritos -->
     <div class="eval-toggle-bar">
       <span class="eval-toggle-lbl">Calificar:</span>

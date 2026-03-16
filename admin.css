@@ -218,6 +218,23 @@
 /* ══════════════════════════════════════════════════
    TOGGLE CREATORS / DISTRITOS
    ══════════════════════════════════════════════════ */
+
+/* Selector de PE dentro del tab Miembros */
+.eval-pe-bar {
+  display: flex; align-items: center; gap: 12px;
+  margin-bottom: 18px; flex-wrap: wrap;
+  padding: 12px 16px;
+  background: var(--glass);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--r-md);
+}
+.eval-pe-lbl {
+  font-family: 'Barlow Condensed', sans-serif;
+  font-size: .6rem; font-weight: 700;
+  letter-spacing: 3px; text-transform: uppercase;
+  color: var(--muted);
+}
+.eval-pe-btns { display: flex; gap: 6px; }
 .eval-toggle-bar {
   display: flex; align-items: center; gap: 12px;
   margin-bottom: 20px; flex-wrap: wrap;

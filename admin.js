@@ -128,6 +128,7 @@ function renderCriterios(rows) {
 function renderMemberChips() {
   const all=getAllMembers(), chips=document.getElementById('member-chips'); if(!chips) return;
   chips.innerHTML=all.map(u=>`<button class="member-chip ${u===aMember?'active':''}" onclick="selectMember('${esc(u)}')">${u}</button>`).join('');
+  syncEvalPEButtons();
   if (!aMember && all.length) selectMember(all[0]);
 }
 function selectMember(usuario) {
@@ -318,14 +319,37 @@ function renderDistritosAdmin(rows) {
   // Usar los puntajes de distrito directamente del Sheet (filas 23+)
   const distScores = D?.districtScores?.[aPE] || [];
 
-  // Agrupar miembros por distrito para las cards expandibles
-  const memberMap = {};
+  // ── Mapa universal de miembros: base en todos los PEs ──────────
+  // Garantiza que en PE2/PE3 se vean todos los miembros aunque no
+  // tengan scores aún en ese período.
+  const universalMap = {}; // { distrito: { usuario: rowInfo } }
+  PORTAL_CONFIG.PERIODOS.forEach(pe => {
+    (D?.scores?.[pe] || []).forEach(r => {
+      const dist = String(r.distrito || '').trim();
+      if (!dist) return;
+      if (!universalMap[dist]) universalMap[dist] = {};
+      // Solo registra info base si todavía no existe (no sobreescribir con datos de otro PE)
+      if (!universalMap[dist][r.usuario]) {
+        universalMap[dist][r.usuario] = {
+          usuario: r.usuario, nombre: r.nombre, rol: r.rol, area: r.area, distrito: dist,
+          pla:0, rev:0, edi:0, dis:0, flu:0, nar:0, eje:0, ext:0, _sinDatos: true,
+        };
+      }
+    });
+  });
+  // Sobreescribir con datos del PE actual (scores reales)
   rows.forEach(r => {
     const dist = String(r.distrito || '').trim();
     if (!dist) return;
-    if (!memberMap[dist]) memberMap[dist] = [];
-    memberMap[dist].push(r);
+    if (!universalMap[dist]) universalMap[dist] = {};
+    universalMap[dist][r.usuario] = { ...r, _sinDatos: false };
   });
+
+  const memberMap = {};
+  Object.entries(universalMap).forEach(([dist, usersObj]) => {
+    memberMap[dist] = Object.values(usersObj);
+  });
+  // ──────────────────────────────────────────────────────────────
 
   // Construir lista usando los puntajes oficiales del sheet
   const districts = distScores.map(d => ({
@@ -381,13 +405,17 @@ function renderDistritosAdmin(rows) {
     const memberRows = membersSorted.map((m, mi) => {
       const s   = calcScore(m);
       const mRc = mi===0?'gold':mi===1?'silver':mi===2?'bronze':'';
+      const sinDatos = m._sinDatos;
       return `<div class="admin-dist-member-row">
         <span class="rank-num ${mRc}" style="font-family:'Bebas Neue',sans-serif;font-size:.9rem;width:22px;flex-shrink:0">#${mi+1}</span>
         <div style="flex:1;min-width:90px">
           <div style="font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:.82rem">${m.nombre||m.usuario}</div>
           <div style="font-size:.6rem;color:var(--muted)">${m.rol||''}${m.area?' · '+m.area:''}</div>
         </div>
-        <span class="sbadge ${scoreClass(s)}">${s}</span>
+        ${sinDatos
+          ? `<span style="font-family:'Barlow Condensed',sans-serif;font-size:.58rem;font-weight:700;letter-spacing:1.5px;color:var(--muted);border:1px solid var(--faint);border-radius:4px;padding:3px 8px;text-transform:uppercase">Sin evaluar</span>`
+          : `<span class="sbadge ${scoreClass(s)}">${s}</span>`
+        }
         <button class="admin-dist-edit-btn" onclick="goToMemberFromDistrict('${esc(m.usuario)}')">✏️ Editar</button>
       </div>`;
     }).join('');
@@ -727,7 +755,34 @@ function renderDebug() {
 function selectPE(pe, btn) {
   aPE=pe; _pendingScores={}; _pendingFeedback={};
   document.querySelectorAll('.admin-pe-bar .pb').forEach(b=>b.classList.remove('active'));
-  btn.classList.add('active'); renderAll();
+  btn.classList.add('active');
+  // Sync the in-tab PE selector
+  syncEvalPEButtons();
+  renderAll();
+}
+
+/* Selector de PE dentro del tab Miembros */
+function selectEvalPE(pe, btn) {
+  aPE = pe;
+  _pendingScores = {}; _pendingFeedback = {}; _pendingDistScores = {};
+  // Sync the top PE bar
+  const topBtns = document.querySelectorAll('.admin-pe-bar .pb');
+  PORTAL_CONFIG.PERIODOS.forEach((p, i) => topBtns[i]?.classList.toggle('active', p === pe));
+  // Update eval PE buttons
+  document.querySelectorAll('#eval-pe-btns .pb').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  // Re-render eval content only
+  if (_evalMode === 'creators') {
+    renderMemberChips();
+    if (aMember) renderMemberDetail(aMember);
+  } else {
+    renderDistrictEditor();
+  }
+}
+
+function syncEvalPEButtons() {
+  const btns = document.querySelectorAll('#eval-pe-btns .pb');
+  PORTAL_CONFIG.PERIODOS.forEach((p, i) => btns[i]?.classList.toggle('active', p === aPE));
 }
 
 /* ── TABS ── */
