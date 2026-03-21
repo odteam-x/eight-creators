@@ -57,6 +57,13 @@ async function loadData() {
         CU.distrito = data.myDistrito;
         Auth.setSession(CU);
       }
+      // Cargar rúbrica de distritos solo para secretario
+      if (isSecretario() && !D.rubricaDistritos) {
+        try {
+          const rd = await API.getRubricaDistritos();
+          if (rd.ok !== false) D.rubricaDistritos = rd.rubrica || rd;
+        } catch(e) { console.warn('[Portal] No se pudo cargar rúbrica distritos'); }
+      }
       Auth.setCachedData(data);
       _lastUpdated = new Date();
     }
@@ -78,6 +85,7 @@ function initUI() {
   // Mostrar/ocultar elementos exclusivos del secretario
   const sec = isSecretario();
   document.querySelectorAll('.sec-only').forEach(el => { el.style.display = sec ? '' : 'none'; });
+  document.querySelectorAll('.mem-only').forEach(el => { el.style.display = sec ? 'none' : ''; });
   document.getElementById('dist-calificacion')?.style && (document.getElementById('dist-calificacion').style.display = sec ? 'block' : 'none');
 
   // Badge de rol
@@ -95,7 +103,7 @@ function initUI() {
 
   renderDistritoHeader();
   renderMyScore('PE1'); renderRankingDistritos('PE1'); renderDistrito('PE1');
-  renderRubrica(); renderCalendario(); updateTimestamp();
+  renderRubrica(); renderTablaEvaluacion(); renderCalendario(); updateTimestamp();
   initScrollEffects();
 }
 
@@ -399,6 +407,54 @@ function renderRubrica() {
   el.innerHTML=rubrica.map((r,i)=>{const c=criterios[i]||{},color=c.color||'#888';return `<div class="rubrica-card" id="rc-${i}"><div class="rubrica-card-head" onclick="document.getElementById('rc-${i}').classList.toggle('open')"><div class="rubrica-dot" style="background:${color}"></div><div class="rubrica-title" style="color:${color}">${r.criterio}</div><span class="rubrica-chev">▾</span></div><div class="rubrica-body"><div class="rubrica-levels">${levels.map(l=>`<div class="rlevel"><div class="rlevel-badge" style="color:${l.color}">${l.n}</div><div class="rlevel-lbl" style="color:${l.color}">${l.lbl}</div><div class="rlevel-desc">${r[lk[l.n]]||'—'}</div></div>`).join('')}</div></div></div>`;}).join('');
 }
 
+/* ── TABLA DE EVALUACIÓN (solo secretario) ── */
+let _rubricaMode = 'creators';
+
+function setRubricaMode(mode, btn) {
+  _rubricaMode = mode;
+  document.querySelectorAll('.eval-rtb').forEach(b=>b.classList.remove('active'));
+  btn?.classList.add('active');
+  document.getElementById('eval-rubric-creators').style.display  = mode==='creators'  ? '' : 'none';
+  document.getElementById('eval-rubric-distritos').style.display = mode==='distritos' ? '' : 'none';
+}
+
+function renderTablaEvaluacion() {
+  if (!isSecretario()) return;
+  _renderRubricaGrid('eval-rubrica-creators-grid',  D?.rubrica || [], getCriterios());
+  _renderRubricaGrid('eval-rubrica-distritos-grid',  D?.rubricaDistritos || [], D?.distCompetencias || [
+    {color:'#38BDF8'},{color:'#2ECC71'},{color:'#C084FC'},{color:'#F0C040'}
+  ]);
+}
+
+function _renderRubricaGrid(elId, rubrica, criterios) {
+  const el = document.getElementById(elId); if (!el) return;
+  if (!rubrica.length) {
+    el.innerHTML='<div class="empty-box"><div class="empty-icon">📋</div><div class="empty-txt">Rúbrica no disponible aún.</div></div>';
+    return;
+  }
+  const levels=[{n:4,lbl:'Excelente',color:'var(--green)'},{n:3,lbl:'Bueno',color:'var(--blue)'},{n:2,lbl:'En Proceso',color:'var(--gold)'},{n:1,lbl:'Bajo',color:'var(--red)'}];
+  const lk={4:'nivel4',3:'nivel3',2:'nivel2',1:'nivel1'};
+  el.innerHTML=rubrica.map((r,i)=>{
+    const c=criterios[i]||{}, color=c.color||'#888', uid=`${elId}-${i}`;
+    return `<div class="rubrica-card" id="${uid}">
+      <div class="rubrica-card-head" onclick="document.getElementById('${uid}').classList.toggle('open')">
+        <div class="rubrica-dot" style="background:${color}"></div>
+        <div class="rubrica-title" style="color:${color}">${r.criterio}</div>
+        <span class="rubrica-chev">▾</span>
+      </div>
+      <div class="rubrica-body">
+        <div class="rubrica-levels">
+          ${levels.map(l=>`<div class="rlevel">
+            <div class="rlevel-badge" style="color:${l.color}">${l.n}</div>
+            <div class="rlevel-lbl" style="color:${l.color}">${l.lbl}</div>
+            <div class="rlevel-desc">${r[lk[l.n]]||'—'}</div>
+          </div>`).join('')}
+        </div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
 /* ── CALENDARIO ── */
 function renderCalendario() {
   const el=document.getElementById('cal-grid'); if(!el) return;
@@ -417,7 +473,7 @@ async function handleRefresh() {
   showToast('Actualizando...','info');
   await loadData(); renderDistritoHeader();
   renderMyScore(mPE); renderRankingDistritos(dPE); renderDistrito(rPE);
-  renderRubrica(); renderCalendario(); updateTimestamp();
+  renderRubrica(); renderTablaEvaluacion(); renderCalendario(); updateTimestamp();
   if(btn){btn.classList.remove('refreshing');btn.disabled=false;}
   showToast('Datos actualizados ✓','ok');
 }
@@ -444,7 +500,7 @@ function switchTabMobile(tab, btn) {
   document.querySelectorAll('.mobile-menu .mobile-nav-btn').forEach(b=>b.classList.remove('active'));
   btn?.classList.add('active'); closeMenu();
   // Sincronizar desktop nav
-  const allTabs=['miscore','ranking','distrito','rubrica','cal'];
+  const allTabs=['miscore','ranking','distrito','evaluacion','rubrica','cal'];
   const idx=allTabs.indexOf(tab);
   const visibleBtns=[...document.querySelectorAll('#desktop-nav .tnav')].filter(b=>b.style.display!=='none');
   const visibleTabs=allTabs.filter((t,i)=>{ const b=document.querySelectorAll('#desktop-nav .tnav')[i]; return !b||b.style.display!=='none'; });

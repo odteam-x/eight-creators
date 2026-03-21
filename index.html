@@ -11,13 +11,13 @@
   <link rel="stylesheet" href="shared.css">
   <style>
     body { display:flex; align-items:center; justify-content:center; min-height:100vh; overflow:hidden; }
-    .login-page { position:relative; z-index:1; width:100%; max-width:420px; padding:24px 20px; animation:loginIn .5s var(--ease) both; }
+    .login-page { position:relative; z-index:1; width:100%; max-width:460px; padding:24px 20px; animation:loginIn .5s var(--ease) both; }
     @keyframes loginIn { from{opacity:0;transform:translateY(24px)} to{opacity:1;transform:translateY(0)} }
-    .login-logo  { display:flex; align-items:center; gap:14px; margin-bottom:28px; justify-content:center; }
-    .logo-img    { width:52px; height:52px; border-radius:var(--r-md); object-fit:contain; }
-    .login-brand h1 { font-family:'Bebas Neue',sans-serif; font-size:1.9rem; letter-spacing:4px; line-height:1; }
+    .login-logo  { display:flex; align-items:center; gap:18px; margin-bottom:32px; justify-content:center; }
+    .logo-img    { width:80px; height:80px; border-radius:var(--r-lg); object-fit:contain; filter:drop-shadow(0 4px 20px rgba(224,90,106,.25)); }
+    .login-brand h1 { font-family:'Bebas Neue',sans-serif; font-size:2.6rem; letter-spacing:5px; line-height:1; }
     .login-brand h1 em { color:var(--red); font-style:normal; }
-    .login-brand-sub { font-family:'Barlow Condensed',sans-serif; font-size:.6rem; font-weight:700; letter-spacing:3px; text-transform:uppercase; color:var(--muted); }
+    .login-brand-sub { font-family:'Barlow Condensed',sans-serif; font-size:.72rem; font-weight:700; letter-spacing:3px; text-transform:uppercase; color:var(--muted); margin-top:3px; }
     .login-card { background:var(--glass); border:1px solid var(--glass-border); border-radius:var(--r-xl); padding:30px 28px; backdrop-filter:blur(20px); box-shadow:var(--shadow-lg),0 0 60px rgba(139,38,53,.08); position:relative; overflow:hidden; }
     .login-card::before { content:''; position:absolute; top:0; left:20%; right:20%; height:1px; background:linear-gradient(90deg,transparent,rgba(224,90,106,.5),transparent); }
     .login-title { font-family:'Bebas Neue',sans-serif; font-size:1.2rem; letter-spacing:4px; text-align:center; margin-bottom:4px; }
@@ -36,7 +36,16 @@
     .login-loading.visible { display:flex; }
     .login-err { display:none; margin-top:12px; text-align:center; font-family:'Barlow Condensed',sans-serif; font-size:.72rem; font-weight:700; letter-spacing:1px; text-transform:uppercase; color:var(--red); padding:10px; background:rgba(224,90,106,.08); border:1px solid rgba(224,90,106,.2); border-radius:var(--r-sm); }
     .login-err.visible { display:block; }
-    @media (max-width:420px) { .login-page{padding:16px 12px} .login-card{padding:24px 18px;border-radius:var(--r-lg)} }
+    @media (max-width:420px) {
+      .login-page  { padding:20px 12px; justify-content:flex-start; padding-top:48px; }
+      .login-card  { padding:24px 18px; border-radius:var(--r-lg); margin-top:20px; }
+      .login-logo  { flex-direction:column; align-items:center; gap:10px; margin-bottom:32px; }
+      .logo-img    { width:80px; height:80px; }
+      .login-brand { text-align:center; }
+      .login-brand h1 { font-size:2rem; letter-spacing:4px; }
+      .login-brand-sub { font-size:.65rem; }
+      body { align-items:center; }
+    }
   </style>
 </head>
 <body>

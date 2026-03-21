@@ -55,34 +55,93 @@ function renderAll() {
 }
 
 /* ── OVERVIEW ── */
-function renderOverview(rows) {
+function renderOverview(allRows) {
   setEl('ov-pe', aPE);
-  const MAX=MAX_TOTAL(), scores=rows.map(calcScore), total=rows.length;
-  const avg=total?(scores.reduce((a,b)=>a+b,0)/total).toFixed(1):'—';
-  const maxS=total?Math.max(...scores):'—', topR=rows.find(r=>calcScore(r)===Math.max(...scores));
-  const exc=scores.filter(s=>s>=26).length, bue=scores.filter(s=>s>=20&&s<26).length;
-  const enP=scores.filter(s=>s>=11&&s<20).length, baj=scores.filter(s=>s<11).length;
 
-  const statsEl=document.getElementById('ov-stats');
-  if (statsEl) statsEl.innerHTML=[
-    {lbl:'Miembros evaluados',val:total, sub:aPE,                        col:''},
-    {lbl:'Promedio del equipo',val:avg,  sub:`/ ${MAX} pts`,              col:avg!=='—'?scoreColor(parseFloat(avg)):''},
-    {lbl:'Puntaje máximo',     val:maxS, sub:topR?.nombre||'—',           col:'var(--sex)'},
-    {lbl:'Nivel Excelente',    val:exc,  sub:`de ${total} miembros`,      col:'var(--sex)'},
+  // ── Filtrar SOLO activos para stats/overview ──────────────────
+  const rows  = allRows.filter(r => (r.estado||'Activo').toLowerCase() !== 'inactivo');
+  const inact = allRows.filter(r => (r.estado||'Activo').toLowerCase() === 'inactivo');
+
+  const MAX    = MAX_TOTAL();
+  const scores = rows.map(calcScore);
+  const total  = rows.length;
+  const avg    = total ? (scores.reduce((a,b)=>a+b,0)/total).toFixed(1) : '—';
+
+  const maxS   = total ? Math.max(...scores) : '—';
+  const minS   = total ? Math.min(...scores) : '—';
+  const topR   = rows.find(r => calcScore(r) === maxS);
+  const botR   = rows.find(r => calcScore(r) === minS);
+
+  // Niveles (usando thresholds de scoreLabel)
+  const exc = scores.filter(s=>s>=26).length;
+  const bue = scores.filter(s=>s>=20&&s<26).length;
+  const enP = scores.filter(s=>s>=11&&s<20).length;
+  const baj = scores.filter(s=>s<11).length;
+
+  // ── Stat cards ────────────────────────────────────────────────
+  const statsEl = document.getElementById('ov-stats');
+  if (statsEl) statsEl.innerHTML = [
+    { lbl:'Miembros activos',    val:total,                         sub:`${inact.length} inactivos`,           col:'' },
+    { lbl:'Promedio del equipo', val:avg,                           sub:`/ ${MAX} pts`,                         col:avg!=='—'?scoreColor(parseFloat(avg)):'' },
+    { lbl:'Puntaje máximo',      val:maxS!=='—'?maxS:'—',          sub:topR?.nombre||'—',                     col:'var(--sex)' },
+    { lbl:'Puntaje mínimo',      val:minS!=='—'?minS:'—',          sub:botR?.nombre||'—',                     col:'var(--sba)' },
+    { lbl:'Excelente (≥26)',      val:exc,                           sub:`${total?((exc/total)*100).toFixed(0):0}% del equipo`, col:'var(--sex)' },
+    { lbl:'Requieren apoyo (<11)',val:baj,                           sub:`${total?((baj/total)*100).toFixed(0):0}% del equipo`, col:baj>0?'var(--sba)':'var(--muted)' },
   ].map(s=>`<div class="scard"><div class="sc-lbl">${s.lbl}</div><div class="sc-val"${s.col?` style="color:${s.col}"`:''}>${s.val}</div><div class="sc-sub">${s.sub}</div></div>`).join('');
 
-  const distEl=document.getElementById('ov-dist');
-  if (distEl) distEl.innerHTML=`<div class="dist-bars">${[
-    {lbl:'Excelente ≥24',n:exc,col:'var(--sex)',pct:total?exc/total:0},
-    {lbl:'Bueno ≥18',    n:bue,col:'var(--sbu)',pct:total?bue/total:0},
-    {lbl:'En Proceso ≥10',n:enP,col:'var(--spr)',pct:total?enP/total:0},
-    {lbl:'Bajo <10',     n:baj,col:'var(--sba)',pct:total?baj/total:0},
-  ].map(d=>`<div class="dist-bar-row"><div class="dist-bar-lbl" style="color:${d.col}">${d.lbl}</div><div class="dist-bar-track"><div class="dist-bar-fill" style="width:${d.pct*100}%;background:${d.col}"></div></div><div class="dist-bar-count" style="color:${d.col}">${d.n}</div></div>`).join('')}</div>`;
+  // ── Top 5 performers ──────────────────────────────────────────
+  const top5El = document.getElementById('ov-top5');
+  if (top5El && rows.length) {
+    const sorted = [...rows].sort((a,b)=>calcScore(b)-calcScore(a)).slice(0,5);
+    const maxScore = calcScore(sorted[0]) || 1;
+    const medals = ['🥇','🥈','🥉','',''];
+    top5El.innerHTML = `
+      <div class="ov-top5-panel">
+        <div class="section-label" style="margin-bottom:12px">Top 5 performers — ${aPE}</div>
+        <div class="ov-top5-list">
+          ${sorted.map((r,i)=>{
+            const s=calcScore(r), rc=i===0?'gold':i===1?'silver':i===2?'bronze':'';
+            const badge = (r.estado||'Activo').toLowerCase()==='inactivo'
+              ? '<span class="estado-badge inactivo">INACTIVO</span>' : '';
+            return `<div class="ov-top5-row">
+              <div class="ov-top5-rank ${rc}">${medals[i]||'#'+(i+1)}</div>
+              <div class="ov-top5-name">${r.nombre||r.usuario}${badge}</div>
+              <div class="ov-top5-dist" style="color:var(--muted);font-size:.68rem">${r.distrito||''}</div>
+              <div class="ov-top5-bar-wrap">
+                <div class="ov-top5-bar"><div class="ov-top5-bar-fill" style="width:${(s/MAX)*100}%;background:${scoreColor(s)}"></div></div>
+              </div>
+              <div class="ov-top5-score" style="color:${scoreColor(s)}">${s}<span style="font-size:.6rem;color:var(--muted)">/${MAX}</span></div>
+              <span class="nivel-badge ${scoreClass(s)}" style="font-size:.55rem;padding:2px 8px">${scoreLabel(s)}</span>
+            </div>`;
+          }).join('')}
+        </div>
+      </div>`;
+  } else if (top5El) {
+    top5El.innerHTML = '';
+  }
 
-  const critEl=document.getElementById('ov-criterios');
-  if (critEl) critEl.innerHTML=`<div class="crit-summary-grid">${getCriterios().map(c=>{
-    const a=total?(rows.reduce((s,r)=>s+(r[c.key]||0),0)/total).toFixed(2):0;
-    return `<div class="cs-row"><div class="cs-lbl" style="color:${c.color}">${c.label}</div><div class="cs-track"><div class="cs-fill" style="width:${(a/4)*100}%;background:${c.color}"></div></div><div class="cs-val" style="color:${c.color}">${a}</div></div>`;
+  // ── Distribución de niveles ───────────────────────────────────
+  const distEl = document.getElementById('ov-dist');
+  if (distEl) distEl.innerHTML = `<div class="dist-bars">${[
+    { lbl:'Excelente ≥26', n:exc, col:'var(--sex)', pct:total?exc/total:0 },
+    { lbl:'Bueno ≥20',     n:bue, col:'var(--sbu)', pct:total?bue/total:0 },
+    { lbl:'En Proceso ≥11',n:enP, col:'var(--spr)', pct:total?enP/total:0 },
+    { lbl:'Bajo <11',      n:baj, col:'var(--sba)', pct:total?baj/total:0 },
+  ].map(d=>`<div class="dist-bar-row">
+    <div class="dist-bar-lbl" style="color:${d.col}">${d.lbl}</div>
+    <div class="dist-bar-track"><div class="dist-bar-fill" style="width:${d.pct*100}%;background:${d.col}"></div></div>
+    <div class="dist-bar-count" style="color:${d.col}">${d.n}</div>
+  </div>`).join('')}</div>`;
+
+  // ── Promedio por criterio ─────────────────────────────────────
+  const critEl = document.getElementById('ov-criterios');
+  if (critEl) critEl.innerHTML = `<div class="crit-summary-grid">${getCriterios().map(c=>{
+    const a = total ? (rows.reduce((s,r)=>s+(r[c.key]||0),0)/total).toFixed(2) : 0;
+    return `<div class="cs-row">
+      <div class="cs-lbl" style="color:${c.color}">${c.label}</div>
+      <div class="cs-track"><div class="cs-fill" style="width:${(a/4)*100}%;background:${c.color}"></div></div>
+      <div class="cs-val" style="color:${c.color}">${a}</div>
+    </div>`;
   }).join('')}</div>`;
 }
 
@@ -91,7 +150,7 @@ function renderRanking(rows) {
   setEl('rk-pe', aPE);
   const tbl=document.getElementById('ranking-tbl'); if(!tbl) return;
   const criterios=getCriterios(), sorted=[...rows].sort((a,b)=>calcScore(b)-calcScore(a));
-  const cols=`1fr 52px ${criterios.map(()=>'38px').join(' ')} 44px`;
+  const cols=`1fr 52px ${criterios.map(()=>'38px').join(' ')} 44px 72px`;
   if (!sorted.length) { tbl.innerHTML='<div class="empty-box"><div class="empty-icon">🏆</div><div class="empty-txt">Sin datos</div></div>'; return; }
   tbl.innerHTML=`
     <div class="tbl-h" style="grid-template-columns:${cols};padding:8px 14px">
@@ -99,14 +158,17 @@ function renderRanking(rows) {
       <div class="tbl-th" style="text-align:center">Pts</div>
       ${criterios.map(c=>`<div class="tbl-th" style="color:${c.color};text-align:center">${c.abbr}</div>`).join('')}
       <div class="tbl-th" style="color:var(--gold);text-align:center">⭐</div>
+      <div class="tbl-th" style="text-align:center">Estado</div>
     </div>
     ${sorted.map((r,i)=>{
       const s=calcScore(r), rc=i===0?'gold':i===1?'silver':i===2?'bronze':'';
-      return `<div class="tbl-r" style="grid-template-columns:${cols};animation-delay:${i*20}ms" onclick="goToMember('${esc(r.usuario)}')">
+      const inactive=(r.estado||'Activo').toLowerCase()==='inactivo';
+      return `<div class="tbl-r${inactive?' tbl-r--inact':''}" style="grid-template-columns:${cols};animation-delay:${i*20}ms" onclick="goToMember('${esc(r.usuario)}')">
         <div class="tbl-td tbl-name-cell"><span class="rank-num ${rc}">#${i+1}</span><span>${r.nombre||r.usuario}</span></div>
         <div class="tbl-td tbl-score-cell"><span class="sbadge ${scoreClass(s)}">${s}</span></div>
         ${criterios.map(c=>`<div class="tbl-td" style="text-align:center;padding:8px 4px"><span class="cdot ${dCls(r[c.key])}">${r[c.key]||0}</span></div>`).join('')}
         <div class="tbl-td" style="text-align:center;padding:8px 4px"><span style="font-family:'Bebas Neue',sans-serif;font-size:1rem;color:${r.ext>0?'var(--gold)':'var(--muted)'}">${r.ext||0}</span></div>
+        <div class="tbl-td" style="text-align:center;padding:8px 4px"><span class="estado-badge ${inactive?'inactivo':'activo'}">${inactive?'INACTIVO':'ACTIVO'}</span></div>
       </div>`;
     }).join('')}`;
 }

@@ -35,5 +35,7 @@ const API = (() => {
     updateBulkDistrictScores:(changes)                            => call('updateBulkDistrictScores', { changes:JSON.stringify(changes) }),
     // Calendario
     saveCalendario:          (eventos)                             => call('saveCalendario',          { eventos:JSON.stringify(eventos) }),
+    // Rúbrica de distritos
+    getRubricaDistritos:     ()                                    => call('getRubricaDistritos'),
   };
 })();

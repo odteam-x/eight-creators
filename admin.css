@@ -421,3 +421,95 @@
   .cal-inp--title { min-width: 100px; }
   .cal-ev-dates { grid-template-columns: 1fr 1fr; }
 }
+/* ══════════════════════════════════════════════════
+   OVERVIEW — Top 5 Panel
+   ══════════════════════════════════════════════════ */
+.ov-top5-panel {
+  background: var(--glass);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--r-lg);
+  padding: 20px 22px;
+  margin-bottom: 20px;
+  position: relative; overflow: hidden;
+}
+.ov-top5-panel::before {
+  content: '';
+  position: absolute; top: 0; left: 0; right: 0; height: 2px;
+  background: linear-gradient(90deg, var(--gold), transparent);
+}
+.ov-top5-list { display: flex; flex-direction: column; gap: 10px; }
+.ov-top5-row {
+  display: grid;
+  grid-template-columns: 32px 1fr 100px 1fr 56px 90px;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 6px;
+  border-radius: var(--r-sm);
+  transition: background .2s;
+}
+.ov-top5-row:hover { background: rgba(255,255,255,.03); }
+
+.ov-top5-rank {
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: 1.1rem; text-align: center; line-height: 1;
+  color: var(--muted);
+}
+.ov-top5-rank.gold   { color: #F0C040; }
+.ov-top5-rank.silver { color: #B0B8D0; }
+.ov-top5-rank.bronze { color: #C87C40; }
+
+.ov-top5-name {
+  font-family: 'Barlow Condensed', sans-serif;
+  font-size: .85rem; font-weight: 700;
+  letter-spacing: .3px;
+  display: flex; align-items: center; gap: 6px;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.ov-top5-dist { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ov-top5-bar-wrap { min-width: 0; }
+.ov-top5-bar {
+  height: 5px; background: var(--faint);
+  border-radius: 3px; overflow: hidden;
+}
+.ov-top5-bar-fill {
+  height: 100%; border-radius: 3px;
+  transition: width .7s var(--ease);
+  box-shadow: 0 0 8px currentColor;
+}
+.ov-top5-score {
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: 1.3rem; line-height: 1;
+  text-align: right; white-space: nowrap;
+}
+
+@media (max-width: 600px) {
+  .ov-top5-row {
+    grid-template-columns: 28px 1fr 44px 80px;
+    gap: 6px;
+  }
+  .ov-top5-dist { display: none; }
+}
+
+/* ══════════════════════════════════════════════════
+   ESTADO BADGE (ranking table)
+   ══════════════════════════════════════════════════ */
+.estado-badge {
+  font-family: 'Barlow Condensed', sans-serif;
+  font-size: .55rem; font-weight: 900;
+  letter-spacing: 2px; text-transform: uppercase;
+  padding: 2px 7px; border-radius: 4px;
+  border: 1px solid currentColor;
+  white-space: nowrap;
+}
+.estado-badge.activo   { color: var(--green); background: rgba(46,204,113,.08); }
+.estado-badge.inactivo { color: var(--muted); background: rgba(255,255,255,.04); }
+
+.tbl-r--inact { opacity: .55; }
+
+
+/* ── NIVEL BADGE (needed for overview top5) ── */
+.nivel-badge { padding:4px 12px; border-radius:20px; font-family:'Barlow Condensed',sans-serif; font-size:.68rem; font-weight:700; letter-spacing:2px; text-transform:uppercase; border:1px solid currentColor; display:inline-flex; align-items:center; }
+.nivel-badge.sex{color:var(--sex);background:rgba(46,204,113,.08)}
+.nivel-badge.sbu{color:var(--sbu);background:rgba(91,127,255,.08)}
+.nivel-badge.spr{color:var(--spr);background:rgba(240,192,64,.08)}
+.nivel-badge.sba{color:var(--sba);background:rgba(224,90,106,.08)}
