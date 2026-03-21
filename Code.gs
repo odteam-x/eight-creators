@@ -81,6 +81,11 @@ function processRequest(params) {
       case 'updateDistrictScore':     result = updateDistrictScore(params.pe, params.distrito, params.competencia, params.valor); break;
       case 'updateBulkDistrictScores':result = updateBulkDistrictScores(JSON.parse(params.changes || '[]'));              break;
       case 'saveCalendario':          result = saveCalendario(JSON.parse(params.eventos || '[]'));                        break;
+      // ── Nuevas acciones de configuración ──
+      case 'saveCriterios':           result = saveCriterios(JSON.parse(params.criterios || '[]'));                       break;
+      case 'saveRubrica':             result = saveRubricaSheet(JSON.parse(params.rubrica || '[]'));                      break;
+      case 'saveRubricaDistritos':    result = saveRubricaDistritosSheet(JSON.parse(params.rubrica || '[]'));             break;
+      case 'saveUsuarios':            result = saveUsuarios(JSON.parse(params.usuarios || '[]'));                         break;
       default: result = { ok:false, error:'Accion desconocida: ' + action };
     }
     return jsonOut(result);
@@ -472,4 +477,92 @@ function formatDate(v) {
   if (!v) return '';
   if (v instanceof Date) return v.getDate()+'/'+(v.getMonth()+1)+'/'+v.getFullYear();
   return String(v).trim();
+}
+
+// ─────────────────────────────────────────────────────────────
+//  ESCRITURA — Criterios
+//  Reemplaza toda la hoja CRITERIOS
+//  criterios: [{key, label, abbr, color}]
+// ─────────────────────────────────────────────────────────────
+function saveCriterios(criterios) {
+  if (!Array.isArray(criterios) || !criterios.length) return { ok:false, error:'criterios debe ser un array no vacío' };
+  var ss    = SpreadsheetApp.openById(SS_ID);
+  var sheet = ss.getSheetByName('CRITERIOS');
+  if (!sheet) return { ok:false, error:'Hoja CRITERIOS no encontrada' };
+  var lastRow = sheet.getLastRow();
+  if (lastRow > 0) sheet.getRange(1, 1, lastRow, 4).clearContent();
+  var rows = criterios.map(function(c) {
+    return [String(c.key||'').trim(), String(c.label||'').trim(), String(c.abbr||'').trim(), String(c.color||'#888888').trim()];
+  });
+  sheet.getRange(1, 1, rows.length, 4).setValues(rows);
+  return { ok:true, saved:rows.length };
+}
+
+// ─────────────────────────────────────────────────────────────
+//  ESCRITURA — Rúbrica de Creators
+//  Reemplaza TABLA DE PUNTUACIÓN
+//  rubrica: [{criterio, nivel4, nivel3, nivel2, nivel1}]
+// ─────────────────────────────────────────────────────────────
+function saveRubricaSheet(rubrica) {
+  if (!Array.isArray(rubrica)) return { ok:false, error:'rubrica debe ser un array' };
+  var ss    = SpreadsheetApp.openById(SS_ID);
+  var sheet = ss.getSheetByName('TABLA DE PUNTUACIÓN') || ss.getSheetByName('TABLA DE PUNTUACION');
+  if (!sheet) return { ok:false, error:'Hoja TABLA DE PUNTUACIÓN no encontrada' };
+  var lastRow = sheet.getLastRow();
+  if (lastRow > 0) sheet.getRange(1, 1, lastRow, 6).clearContent();
+  if (!rubrica.length) return { ok:true, saved:0 };
+  var rows = rubrica.map(function(r, i) {
+    return ['', String(r.criterio||'').trim(), String(r.nivel4||'').trim(), String(r.nivel3||'').trim(), String(r.nivel2||'').trim(), String(r.nivel1||'').trim()];
+  });
+  sheet.getRange(1, 1, rows.length, 6).setValues(rows);
+  return { ok:true, saved:rows.length };
+}
+
+// ─────────────────────────────────────────────────────────────
+//  ESCRITURA — Rúbrica de Distritos
+//  Reemplaza TABLA DE PUNTUACIÓN Distritos
+// ─────────────────────────────────────────────────────────────
+function saveRubricaDistritosSheet(rubrica) {
+  if (!Array.isArray(rubrica)) return { ok:false, error:'rubrica debe ser un array' };
+  var ss    = SpreadsheetApp.openById(SS_ID);
+  var sheet = ss.getSheetByName('TABLA DE PUNTUACIÓN Distritos')
+             || ss.getSheetByName('TABLA DE PUNTUACION Distritos')
+             || ss.getSheetByName('TABLA DE PUNTUACIÓN DISTRITOS')
+             || ss.getSheetByName('RUBRICA DISTRITOS');
+  if (!sheet) return { ok:false, error:'Hoja de rúbrica de distritos no encontrada' };
+  var lastRow = sheet.getLastRow();
+  if (lastRow > 0) sheet.getRange(1, 1, lastRow, 6).clearContent();
+  if (!rubrica.length) return { ok:true, saved:0 };
+  var rows = rubrica.map(function(r) {
+    return ['', String(r.criterio||'').trim(), String(r.nivel4||'').trim(), String(r.nivel3||'').trim(), String(r.nivel2||'').trim(), String(r.nivel1||'').trim()];
+  });
+  sheet.getRange(1, 1, rows.length, 6).setValues(rows);
+  return { ok:true, saved:rows.length };
+}
+
+// ─────────────────────────────────────────────────────────────
+//  ESCRITURA — Usuarios (CRUD completo)
+//  Reemplaza todas las filas de USUARIOS (fila 1 = encabezado)
+//  usuarios: [{user, pass, name, rol, distrito}]
+// ─────────────────────────────────────────────────────────────
+function saveUsuarios(usuarios) {
+  if (!Array.isArray(usuarios)) return { ok:false, error:'usuarios debe ser un array' };
+  var ss    = SpreadsheetApp.openById(SS_ID);
+  var sheet = ss.getSheetByName('USUARIOS');
+  if (!sheet) return { ok:false, error:'Hoja USUARIOS no encontrada' };
+  // Mantener fila 1 (encabezado), limpiar desde fila 2
+  var lastRow = sheet.getLastRow();
+  if (lastRow > 1) sheet.getRange(2, 1, lastRow - 1, 5).clearContent();
+  if (!usuarios.length) return { ok:true, saved:0 };
+  var rows = usuarios.map(function(u) {
+    return [
+      String(u.user||'').trim(),
+      String(u.pass||'').trim(),
+      String(u.name||'').trim(),
+      String(u.rol||'miembro').trim().toLowerCase(),
+      String(u.distrito||'').trim(),
+    ];
+  });
+  sheet.getRange(2, 1, rows.length, 5).setValues(rows);
+  return { ok:true, saved:rows.length };
 }

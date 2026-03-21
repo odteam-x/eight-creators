@@ -51,7 +51,7 @@ function renderAll() {
   renderOverview(rows); renderRanking(rows); renderCriterios(rows);
   renderDistritosAdmin(rows);
   renderMemberChips(); if (aMember) renderMemberDetail(aMember);
-  renderRubrica(); renderCalendarioAdmin(); renderDebug(); updateTimestamp();
+  renderRubricaAdmin(); renderConfig(); renderCalendarioAdmin(); renderDebug(); updateTimestamp();
 }
 
 /* ── OVERVIEW ── */
@@ -361,17 +361,370 @@ async function saveFeedback(usuario) {
   finally { if(btn){btn.textContent='Guardar feedback';btn.classList.remove('saving');} }
 }
 
-/* ── RÚBRICA ── */
-function renderRubrica() {
-  const el=document.getElementById('rubrica-grid'); if(!el) return;
-  const rubrica=D?.rubrica||[], criterios=getCriterios();
-  if (!rubrica.length) { el.innerHTML='<div class="empty-box"><div class="empty-icon">📋</div><div class="empty-txt">Sin datos</div></div>'; return; }
-  const levels=[{n:4,lbl:'Excelente',col:'var(--green)'},{n:3,lbl:'Bueno',col:'var(--blue)'},{n:2,lbl:'En Proceso',col:'var(--gold)'},{n:1,lbl:'Bajo',col:'var(--red)'}];
-  const lk={4:'nivel4',3:'nivel3',2:'nivel2',1:'nivel1'};
-  el.innerHTML=rubrica.map((r,i)=>{
-    const c=criterios[i]||{}, color=c.color||'#888';
-    return `<div class="rubrica-card" id="rc-${i}"><div class="rubrica-card-head" onclick="document.getElementById('rc-${i}').classList.toggle('open')"><div class="rubrica-dot" style="background:${color}"></div><div class="rubrica-title" style="color:${color}">${r.criterio}</div><span class="rubrica-chev">▾</span></div><div class="rubrica-body"><div class="rubrica-levels">${levels.map(l=>`<div class="rlevel"><div class="rlevel-badge" style="color:${l.col}">${l.n}</div><div class="rlevel-lbl" style="color:${l.col}">${l.lbl}</div><div class="rlevel-desc">${r[lk[l.n]]||'—'}</div></div>`).join('')}</div></div></div>`;
+/* ══════════════════════════════════════════════════════════════
+   RÚBRICA EDITABLE — Admin
+   ══════════════════════════════════════════════════════════════ */
+
+let _rubricaAdminMode = 'creators';
+let _rubricaCreators  = [];  // copia editable
+let _rubricaDistritos = [];
+let _rubricaDirty     = { creators:false, distritos:false };
+
+function setRubricaAdminMode(mode, btn) {
+  _rubricaAdminMode = mode;
+  document.querySelectorAll('.cfg-toggle-btn').forEach(b => b.classList.remove('active'));
+  btn?.classList.add('active');
+  document.getElementById('rubrica-admin-creators').style.display  = mode === 'creators'  ? '' : 'none';
+  document.getElementById('rubrica-admin-distritos').style.display = mode === 'distritos' ? '' : 'none';
+}
+
+function renderRubricaAdmin() {
+  // Sincronizar copias editables desde D solo si no hay cambios pendientes
+  if (!_rubricaDirty.creators)  _rubricaCreators  = (D?.rubrica          || []).map(r => ({...r}));
+  if (!_rubricaDirty.distritos) _rubricaDistritos = (D?.rubricaDistritos  || []).map(r => ({...r}));
+  renderRubricaEditor('creators');
+  renderRubricaEditor('distritos');
+}
+
+function renderRubricaEditor(mode) {
+  const el = document.getElementById(`rubrica-editor-${mode}`); if (!el) return;
+  const data = mode === 'creators' ? _rubricaCreators : _rubricaDistritos;
+  const levels = [
+    { key:'nivel4', lbl:'Nivel 4 — Excelente', col:'var(--green)' },
+    { key:'nivel3', lbl:'Nivel 3 — Bueno',      col:'var(--blue)' },
+    { key:'nivel2', lbl:'Nivel 2 — En Proceso',  col:'var(--gold)' },
+    { key:'nivel1', lbl:'Nivel 1 — Bajo',         col:'var(--red)' },
+  ];
+
+  if (!data.length) {
+    el.innerHTML = `<div class="empty-box"><div class="empty-icon">📋</div><div class="empty-txt">Sin datos. Agrega criterios con el botón de arriba.</div></div>`;
+    return;
+  }
+
+  el.innerHTML = data.map((r, i) => `
+    <div class="cfg-rubrica-card" id="rbc-${mode}-${i}">
+      <div class="cfg-rubrica-head">
+        <div class="cfg-rubrica-num">${i + 1}</div>
+        <input class="cfg-inp cfg-inp--name" value="${esc(r.criterio||'')}"
+          placeholder="Nombre del criterio..."
+          oninput="updateRubricaRow('${mode}',${i},'criterio',this.value)">
+        <button class="cfg-btn-del" onclick="deleteRubricaRow('${mode}',${i})" title="Eliminar">✕</button>
+      </div>
+      <div class="cfg-rubrica-levels">
+        ${levels.map(l => `
+          <div class="cfg-rubrica-level">
+            <div class="cfg-level-lbl" style="color:${l.col}">${l.lbl}</div>
+            <textarea class="cfg-textarea" rows="2"
+              oninput="updateRubricaRow('${mode}',${i},'${l.key}',this.value)"
+              placeholder="Descripción del nivel...">${esc(r[l.key]||'')}</textarea>
+          </div>`).join('')}
+      </div>
+    </div>`).join('');
+}
+
+function updateRubricaRow(mode, idx, field, value) {
+  const data = mode === 'creators' ? _rubricaCreators : _rubricaDistritos;
+  if (data[idx]) { data[idx][field] = value; markRubricaDirty(mode); }
+}
+
+function addRubricaRow(mode) {
+  const data = mode === 'creators' ? _rubricaCreators : _rubricaDistritos;
+  data.push({ criterio:'', nivel4:'', nivel3:'', nivel2:'', nivel1:'' });
+  markRubricaDirty(mode);
+  renderRubricaEditor(mode);
+  setTimeout(() => document.querySelector(`#rubrica-editor-${mode} .cfg-rubrica-card:last-child .cfg-inp--name`)?.focus(), 80);
+}
+
+function deleteRubricaRow(mode, idx) {
+  const data = mode === 'creators' ? _rubricaCreators : _rubricaDistritos;
+  data.splice(idx, 1);
+  markRubricaDirty(mode);
+  renderRubricaEditor(mode);
+}
+
+function markRubricaDirty(mode) {
+  _rubricaDirty[mode] = true;
+  document.getElementById(`btn-save-rubrica-${mode}`)?.classList.remove('hidden');
+}
+
+async function saveRubricaAdmin(mode) {
+  const btnId = `btn-save-rubrica-${mode}`;
+  const btn   = document.getElementById(btnId);
+  if (btn) { btn.textContent = 'Guardando...'; btn.classList.add('saving'); }
+  try {
+    const data = mode === 'creators' ? _rubricaCreators : _rubricaDistritos;
+    const r    = mode === 'creators'
+      ? await API.saveRubrica(data)
+      : await API.saveRubricaDistritos(data);
+    if (!r.ok) { showToast(`Error: ${r.error||''}`, 'error'); }
+    else {
+      showToast(`✓ Rúbrica de ${mode === 'creators' ? 'Creators' : 'Distritos'} guardada`, 'ok');
+      _rubricaDirty[mode] = false;
+      document.getElementById(btnId)?.classList.add('hidden');
+      await loadData();
+    }
+  } catch(e) { showToast('Error al guardar', 'error'); console.error(e); }
+  finally {
+    if (btn) {
+      btn.innerHTML = '<svg viewBox="0 0 16 16" width="14" height="14" fill="none"><path d="M13.5 4.5L6 12 2.5 8.5" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg> Guardar rúbrica';
+      btn.classList.remove('saving');
+    }
+  }
+}
+
+/* ══════════════════════════════════════════════════════════════
+   CONFIGURACIÓN — Criterios + Usuarios
+   ══════════════════════════════════════════════════════════════ */
+
+let _configTab       = 'criterios';
+let _criteriosEdit   = [];
+let _usuariosEdit    = [];
+let _critDirty       = false;
+let _userDirty       = false;
+
+function switchConfigTab(tab, btn) {
+  _configTab = tab;
+  document.querySelectorAll('.cfg-subtab').forEach(b => b.classList.remove('active'));
+  btn?.classList.add('active');
+  document.getElementById('cfg-panel-criterios').style.display = tab === 'criterios' ? '' : 'none';
+  document.getElementById('cfg-panel-usuarios').style.display  = tab === 'usuarios'  ? '' : 'none';
+}
+
+function renderConfig() {
+  if (!_critDirty) _criteriosEdit = (D?.criterios || getCriterios()).map(c => ({...c}));
+  if (!_userDirty) _usuariosEdit  = (D?.users     || []).map(u => ({...u}));
+  renderCriteriosEditor();
+  renderUsuariosEditor();
+}
+
+/* ── Criterios Editor ───────────────────────────────────────── */
+const PRESET_COLORS = ['#E05A6A','#38BDF8','#2ECC71','#5B7FFF','#C084FC','#F0C040','#FB923C','#F472B6','#94A3B8'];
+
+function renderCriteriosEditor() {
+  const el = document.getElementById('criterios-editor'); if (!el) return;
+  if (!_criteriosEdit.length) {
+    el.innerHTML = `<div class="empty-box"><div class="empty-icon">📐</div><div class="empty-txt">Sin criterios. Agrega el primero.</div></div>`;
+    return;
+  }
+  el.innerHTML = _criteriosEdit.map((c, i) => `
+    <div class="cfg-crit-card" id="ccc-${i}">
+      <div class="cfg-crit-num">${i + 1}</div>
+      <div class="cfg-crit-preview" style="background:${c.color||'#888'}" title="Color"></div>
+      <input class="cfg-inp cfg-inp--label" value="${esc(c.label||'')}"
+        placeholder="Nombre del criterio..."
+        oninput="updateCriterio(${i},'label',this.value)">
+      <input class="cfg-inp cfg-inp--abbr" value="${esc(c.abbr||'')}" maxlength="4"
+        placeholder="ABR"
+        oninput="updateCriterio(${i},'abbr',this.value.toUpperCase());this.value=this.value.toUpperCase()">
+      <input class="cfg-inp cfg-inp--key" value="${esc(c.key||'')}" maxlength="6"
+        placeholder="clave"
+        oninput="updateCriterio(${i},'key',this.value.toLowerCase());this.value=this.value.toLowerCase()">
+      <div class="cfg-color-swatches">
+        ${PRESET_COLORS.map(col => `<button class="cfg-swatch${c.color===col?' active':''}" style="background:${col}" onclick="updateCriterio(${i},'color','${col}')" title="${col}"></button>`).join('')}
+        <input type="color" class="cfg-color-pick" value="${c.color||'#888888'}"
+          oninput="updateCriterio(${i},'color',this.value)">
+      </div>
+      <button class="cfg-btn-del" onclick="deleteCriterio(${i})" title="Eliminar">✕</button>
+    </div>`).join('');
+}
+
+function updateCriterio(idx, field, value) {
+  if (_criteriosEdit[idx]) {
+    _criteriosEdit[idx][field] = value;
+    if (field === 'color') {
+      const preview = document.querySelector(`#ccc-${idx} .cfg-crit-preview`);
+      if (preview) preview.style.background = value;
+      document.querySelectorAll(`#ccc-${idx} .cfg-swatch`).forEach(s => s.classList.toggle('active', s.style.background === value || s.title === value));
+    }
+    markCritDirty();
+  }
+}
+
+function addCriterioRow() {
+  const idx = _criteriosEdit.length;
+  _criteriosEdit.push({ key:`c${idx+1}`, label:'', abbr:'', color: PRESET_COLORS[idx % PRESET_COLORS.length] });
+  markCritDirty();
+  renderCriteriosEditor();
+  setTimeout(() => document.querySelector(`#ccc-${idx} .cfg-inp--label`)?.focus(), 80);
+}
+
+function deleteCriterio(idx) {
+  _criteriosEdit.splice(idx, 1);
+  markCritDirty();
+  renderCriteriosEditor();
+}
+
+function markCritDirty() {
+  _critDirty = true;
+  document.getElementById('btn-save-criterios')?.classList.remove('hidden');
+}
+
+async function saveCriteriosAdmin() {
+  const btn = document.getElementById('btn-save-criterios');
+  if (btn) { btn.textContent = 'Guardando...'; btn.classList.add('saving'); }
+  try {
+    const r = await API.saveCriterios(_criteriosEdit);
+    if (!r.ok) { showToast(`Error: ${r.error||''}`, 'error'); }
+    else {
+      showToast(`✓ ${r.saved} criterios guardados`, 'ok');
+      _critDirty = false;
+      document.getElementById('btn-save-criterios')?.classList.add('hidden');
+      await loadData(); renderAll();
+    }
+  } catch(e) { showToast('Error al guardar', 'error'); console.error(e); }
+  finally {
+    if (btn) {
+      btn.innerHTML = '<svg viewBox="0 0 16 16" width="14" height="14" fill="none"><path d="M13.5 4.5L6 12 2.5 8.5" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg> Guardar criterios';
+      btn.classList.remove('saving');
+    }
+  }
+}
+
+/* ── Usuarios Editor ─────────────────────────────────────────── */
+const ROLES_OPTS = ['admin','secretario','miembro'];
+
+function renderUsuariosEditor() {
+  const el = document.getElementById('usuarios-editor'); if (!el) return;
+  if (!_usuariosEdit.length) {
+    el.innerHTML = `<div class="empty-box"><div class="empty-icon">👥</div><div class="empty-txt">Sin usuarios. Agrega el primero.</div></div>`;
+    return;
+  }
+
+  // Agrupar por rol para visualización
+  const rolOrder = { admin:0, secretario:1, miembro:2 };
+  const sorted   = [..._usuariosEdit].map((u,i) => ({...u, _idx:i}))
+    .sort((a,b) => (rolOrder[a.rol]||3)-(rolOrder[b.rol]||3));
+
+  const rolColors = { admin:'var(--gold)', secretario:'var(--blue)', miembro:'var(--red)' };
+
+  el.innerHTML = sorted.map(u => {
+    const i = u._idx;
+    return `
+    <div class="cfg-user-card" id="ucc-${i}">
+      <div class="cfg-user-head">
+        <div class="cfg-user-avatar" style="background:${rolColors[u.rol]||'var(--muted)'}">
+          ${(u.name||u.user||'?').split(' ').map(w=>w[0]).slice(0,2).join('').toUpperCase()||'?'}
+        </div>
+        <div class="cfg-user-info">
+          <div class="cfg-user-role-badge" style="color:${rolColors[u.rol]||'var(--muted)'}">
+            ${u.rol?.toUpperCase()||'MIEMBRO'}
+          </div>
+          <div class="cfg-user-fullname">${u.name||u.user||'—'}</div>
+        </div>
+        <button class="cfg-btn-del" onclick="deleteUsuario(${i})" title="Eliminar usuario">✕</button>
+      </div>
+      <div class="cfg-user-fields">
+        <div class="cfg-field-group">
+          <label class="cfg-field-lbl">Nombre completo</label>
+          <input class="cfg-inp" value="${esc(u.name||'')}" placeholder="Nombre..."
+            oninput="updateUsuario(${i},'name',this.value)">
+        </div>
+        <div class="cfg-field-group">
+          <label class="cfg-field-lbl">Usuario</label>
+          <input class="cfg-inp" value="${esc(u.user||'')}" placeholder="usuario123"
+            oninput="updateUsuario(${i},'user',this.value)">
+        </div>
+        <div class="cfg-field-group">
+          <label class="cfg-field-lbl">Contraseña</label>
+          <input class="cfg-inp" type="text" value="${esc(u.pass||'')}" placeholder="contraseña"
+            oninput="updateUsuario(${i},'pass',this.value)">
+        </div>
+        <div class="cfg-field-group">
+          <label class="cfg-field-lbl">Rol</label>
+          <select class="cfg-inp cfg-select" onchange="updateUsuario(${i},'rol',this.value)">
+            ${ROLES_OPTS.map(r => `<option value="${r}" ${u.rol===r?'selected':''}>${r.charAt(0).toUpperCase()+r.slice(1)}</option>`).join('')}
+          </select>
+        </div>
+        <div class="cfg-field-group">
+          <label class="cfg-field-lbl">Distrito <span style="color:var(--muted)">(secretario)</span></label>
+          <input class="cfg-inp" value="${esc(u.distrito||'')}" placeholder="ej: 08-01"
+            oninput="updateUsuario(${i},'distrito',this.value)">
+        </div>
+      </div>
+    </div>`;
   }).join('');
+}
+
+function updateUsuario(idx, field, value) {
+  if (_usuariosEdit[idx]) {
+    _usuariosEdit[idx][field] = value;
+    if (field === 'name' || field === 'rol') {
+      // Actualizar avatar y badge sin re-render completo
+      const card    = document.getElementById(`ucc-${idx}`);
+      const rolColors = { admin:'var(--gold)', secretario:'var(--blue)', miembro:'var(--red)' };
+      if (field === 'name') {
+        const av = card?.querySelector('.cfg-user-avatar');
+        if (av) av.textContent = (value||'?').split(' ').map(w=>w[0]).slice(0,2).join('').toUpperCase()||'?';
+        const fn = card?.querySelector('.cfg-user-fullname');
+        if (fn) fn.textContent = value || '—';
+      }
+      if (field === 'rol') {
+        const color = rolColors[value]||'var(--muted)';
+        const av    = card?.querySelector('.cfg-user-avatar');
+        const rb    = card?.querySelector('.cfg-user-role-badge');
+        if (av) av.style.background = color;
+        if (rb) { rb.textContent = value.toUpperCase(); rb.style.color = color; }
+      }
+    }
+    markUserDirty();
+  }
+}
+
+function addUsuarioRow() {
+  const idx = _usuariosEdit.length;
+  _usuariosEdit.push({ user:'', pass:'', name:'', rol:'miembro', distrito:'' });
+  markUserDirty();
+  renderUsuariosEditor();
+  setTimeout(() => document.querySelector(`#ucc-${idx} .cfg-inp`)?.focus(), 80);
+}
+
+function deleteUsuario(idx) {
+  const u = _usuariosEdit[idx];
+  if (u?.user === CU?.user) { showToast('No puedes eliminar tu propio usuario', 'error'); return; }
+  _usuariosEdit.splice(idx, 1);
+  markUserDirty();
+  renderUsuariosEditor();
+}
+
+function markUserDirty() {
+  _userDirty = true;
+  document.getElementById('btn-save-usuarios')?.classList.remove('hidden');
+}
+
+async function saveUsuariosAdmin() {
+  const btn = document.getElementById('btn-save-usuarios');
+  if (btn) { btn.textContent = 'Guardando...'; btn.classList.add('saving'); }
+  // Validación básica
+  const invalid = _usuariosEdit.filter(u => !u.user?.trim() || !u.pass?.trim());
+  if (invalid.length) {
+    showToast(`${invalid.length} usuario(s) sin usuario o contraseña`, 'error');
+    if (btn) { btn.innerHTML = '<svg viewBox="0 0 16 16" width="14" height="14" fill="none"><path d="M13.5 4.5L6 12 2.5 8.5" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg> Guardar usuarios'; btn.classList.remove('saving'); }
+    return;
+  }
+  // Detectar duplicados
+  const keys = _usuariosEdit.map(u => u.user?.trim().toLowerCase());
+  const dups  = keys.filter((k,i) => keys.indexOf(k) !== i);
+  if (dups.length) {
+    showToast(`Usuario duplicado: ${[...new Set(dups)].join(', ')}`, 'error');
+    if (btn) { btn.innerHTML = '<svg viewBox="0 0 16 16" width="14" height="14" fill="none"><path d="M13.5 4.5L6 12 2.5 8.5" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg> Guardar usuarios'; btn.classList.remove('saving'); }
+    return;
+  }
+  try {
+    const r = await API.saveUsuarios(_usuariosEdit);
+    if (!r.ok) { showToast(`Error: ${r.error||''}`, 'error'); }
+    else {
+      showToast(`✓ ${r.saved} usuarios guardados`, 'ok');
+      _userDirty = false;
+      document.getElementById('btn-save-usuarios')?.classList.add('hidden');
+      await loadData(); renderConfig();
+    }
+  } catch(e) { showToast('Error al guardar', 'error'); console.error(e); }
+  finally {
+    if (btn) {
+      btn.innerHTML = '<svg viewBox="0 0 16 16" width="14" height="14" fill="none"><path d="M13.5 4.5L6 12 2.5 8.5" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg> Guardar usuarios';
+      btn.classList.remove('saving');
+    }
+  }
 }
 
 /* ── DISTRITOS ADMIN ── */
@@ -859,7 +1212,7 @@ function switchTabMobile(tab, btn) {
   document.getElementById(`tab-${tab}`)?.classList.add('active');
   document.querySelectorAll('.mobile-menu .mobile-nav-btn').forEach(b=>b.classList.remove('active'));
   btn?.classList.add('active'); closeMenu();
-  const tabs=['overview','ranking','criterios','distritos','miembros','rubrica','calendario','debug'], idx=tabs.indexOf(tab);
+  const tabs=['overview','ranking','criterios','distritos','miembros','rubrica','calendario','config','debug'], idx=tabs.indexOf(tab);
   document.querySelectorAll('#desktop-nav .tnav').forEach((b,i)=>b.classList.toggle('active',i===idx));
 }
 function goToMember(usuario) { switchTab('miembros', document.querySelector('#desktop-nav .tnav:nth-child(4)')); selectMember(usuario); }

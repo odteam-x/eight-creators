@@ -35,6 +35,7 @@
     <button class="tnav"        onclick="switchTab('miembros',this)">Miembros</button>
     <button class="tnav"        onclick="switchTab('rubrica',this)">Rúbrica</button>
     <button class="tnav"                           onclick="switchTab('calendario',this)">Calendario</button>
+    <button class="tnav" style="color:var(--cyan)"  onclick="switchTab('config',this)">⚙ Config</button>
     <button class="tnav" style="color:var(--gold)" onclick="switchTab('debug',this)">🔍</button>
   </nav>
   <div class="tb-user">
@@ -57,6 +58,7 @@
     <button class="mobile-nav-btn"        onclick="switchTabMobile('miembros',this)">👥 &nbsp;Miembros</button>
     <button class="mobile-nav-btn"        onclick="switchTabMobile('rubrica',this)">📋 &nbsp;Rúbrica</button>
     <button class="mobile-nav-btn"                           onclick="switchTabMobile('calendario',this)">📅 &nbsp;Calendario</button>
+    <button class="mobile-nav-btn" style="color:var(--cyan)" onclick="switchTabMobile('config',this)">⚙️ &nbsp;Configuración</button>
     <button class="mobile-nav-btn" style="color:var(--gold)" onclick="switchTabMobile('debug',this)">🔍 &nbsp;Diagnóstico</button>
     <button class="mobile-nav-btn mobile-nav-btn--refresh" onclick="handleRefresh();closeMenu()">
       <svg class="refresh-icon" viewBox="0 0 16 16" fill="none"><path d="M13.65 2.35A8 8 0 1 0 15 8h-1.5A6.5 6.5 0 1 1 8 1.5a6.44 6.44 0 0 1 4.59 1.91L10.5 5.5H15V1l-1.35 1.35z" fill="currentColor"/></svg>
@@ -165,12 +167,78 @@
     </div>
   </div>
 
-  <!-- RÚBRICA -->
+  <!-- RÚBRICA (editable) -->
   <div id="tab-rubrica" class="atab-content">
     <div class="ptitle">TABLA DE PUNTUACIÓN</div>
-    <div class="rubrica-wrap">
-      <p class="rubrica-intro">Cada criterio se evalúa del <strong>1 al 4</strong>. Puntaje máximo: <strong>28 puntos</strong>.</p>
-      <div class="rubrica-grid" id="rubrica-grid"></div>
+
+    <div class="cfg-toggle-bar">
+      <button class="cfg-toggle-btn active" id="rtb-creators" onclick="setRubricaAdminMode('creators',this)">👤 Creators</button>
+      <button class="cfg-toggle-btn"        id="rtb-distritos" onclick="setRubricaAdminMode('distritos',this)">🗺️ Distritos</button>
+    </div>
+
+    <!-- Creators -->
+    <div id="rubrica-admin-creators">
+      <div class="cfg-toolbar">
+        <button class="btn-cfg-add" onclick="addRubricaRow('creators')">+ Agregar criterio</button>
+        <div style="flex:1"></div>
+        <button class="btn-save btn-save-cfg hidden" id="btn-save-rubrica-creators" onclick="saveRubricaAdmin('creators')">
+          <svg viewBox="0 0 16 16" width="14" height="14" fill="none"><path d="M13.5 4.5L6 12 2.5 8.5" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+          Guardar rúbrica
+        </button>
+      </div>
+      <div id="rubrica-editor-creators"></div>
+    </div>
+
+    <!-- Distritos -->
+    <div id="rubrica-admin-distritos" style="display:none">
+      <div class="cfg-toolbar">
+        <button class="btn-cfg-add" onclick="addRubricaRow('distritos')">+ Agregar competencia</button>
+        <div style="flex:1"></div>
+        <button class="btn-save btn-save-cfg hidden" id="btn-save-rubrica-distritos" onclick="saveRubricaAdmin('distritos')">
+          <svg viewBox="0 0 16 16" width="14" height="14" fill="none"><path d="M13.5 4.5L6 12 2.5 8.5" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+          Guardar rúbrica
+        </button>
+      </div>
+      <div id="rubrica-editor-distritos"></div>
+    </div>
+  </div>
+
+  <!-- CONFIGURACIÓN -->
+  <div id="tab-config" class="atab-content">
+    <div class="ptitle">CONFIGURACIÓN</div>
+
+    <!-- Sub-tabs -->
+    <div class="cfg-subtabs">
+      <button class="cfg-subtab active" id="cst-criterios"  onclick="switchConfigTab('criterios',this)">📐 Criterios</button>
+      <button class="cfg-subtab"        id="cst-usuarios"   onclick="switchConfigTab('usuarios',this)">👥 Usuarios</button>
+    </div>
+
+    <!-- Panel: Criterios -->
+    <div id="cfg-panel-criterios">
+      <div class="cfg-toolbar">
+        <p class="cfg-hint">Define los criterios de evaluación. Cada uno tiene un nombre, abreviatura (3 letras) y color.</p>
+        <button class="btn-cfg-add" onclick="addCriterioRow()">+ Agregar criterio</button>
+        <div style="flex:1"></div>
+        <button class="btn-save btn-save-cfg hidden" id="btn-save-criterios" onclick="saveCriteriosAdmin()">
+          <svg viewBox="0 0 16 16" width="14" height="14" fill="none"><path d="M13.5 4.5L6 12 2.5 8.5" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+          Guardar criterios
+        </button>
+      </div>
+      <div id="criterios-editor"></div>
+    </div>
+
+    <!-- Panel: Usuarios -->
+    <div id="cfg-panel-usuarios" style="display:none">
+      <div class="cfg-toolbar">
+        <p class="cfg-hint">Gestiona todos los usuarios del portal. Los cambios aplican en el próximo inicio de sesión.</p>
+        <button class="btn-cfg-add" onclick="addUsuarioRow()">+ Nuevo usuario</button>
+        <div style="flex:1"></div>
+        <button class="btn-save btn-save-cfg hidden" id="btn-save-usuarios" onclick="saveUsuariosAdmin()">
+          <svg viewBox="0 0 16 16" width="14" height="14" fill="none"><path d="M13.5 4.5L6 12 2.5 8.5" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+          Guardar usuarios
+        </button>
+      </div>
+      <div id="usuarios-editor"></div>
     </div>
   </div>
 

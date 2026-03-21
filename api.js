@@ -37,5 +37,10 @@ const API = (() => {
     saveCalendario:          (eventos)                             => call('saveCalendario',          { eventos:JSON.stringify(eventos) }),
     // Rúbrica de distritos
     getRubricaDistritos:     ()                                    => call('getRubricaDistritos'),
+    // Configuración — escritura
+    saveCriterios:           (criterios)                           => call('saveCriterios',        { criterios:JSON.stringify(criterios) }),
+    saveRubrica:             (rubrica)                             => call('saveRubrica',           { rubrica:JSON.stringify(rubrica) }),
+    saveRubricaDistritos:    (rubrica)                             => call('saveRubricaDistritos',  { rubrica:JSON.stringify(rubrica) }),
+    saveUsuarios:            (usuarios)                            => call('saveUsuarios',           { usuarios:JSON.stringify(usuarios) }),
   };
 })();
