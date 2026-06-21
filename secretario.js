@@ -7,7 +7,7 @@
 
 let CU = null, D = null;
 let mPE='PE1', rPE='PE1', dPE='PE1';
-let _arTimer=null, _lastUpdated=null, _menuOpen=false;
+let _arTimer=null, _lastUpdated=null, _menuOpen=false, _peInited=false;
 
 const CRITERIOS_DEFAULT = [
   { key:'pla', label:'Planificación',       abbr:'PLA', color:'#E05A6A' },
@@ -45,7 +45,6 @@ document.addEventListener('DOMContentLoaded', async () => {
   if (cached) { D = cached; initUI(); }
   await loadData();
   initUI();
-  startAutoRefresh();
 });
 
 async function loadData() {
@@ -56,6 +55,10 @@ async function loadData() {
       if (data.myDistrito) {
         CU.distrito = data.myDistrito;
         Auth.setSession(CU);
+      }
+      if (!_peInited && data.config?.periodoActivo) {
+        mPE = rPE = dPE = data.config.periodoActivo;
+        _peInited = true;
       }
       // Cargar rúbrica de distritos solo para secretario
       if (isSecretario() && !D.rubricaDistritos) {
@@ -68,15 +71,6 @@ async function loadData() {
       _lastUpdated = new Date();
     }
   } catch(e) { console.error('[Portal]', e); }
-}
-
-function startAutoRefresh() {
-  if (_arTimer) clearInterval(_arTimer);
-  _arTimer = setInterval(async () => {
-    await loadData();
-    renderMyScore(mPE); renderRankingDistritos(dPE); renderDistrito(rPE);
-    renderCalendario(); updateTimestamp();
-  }, PORTAL_CONFIG.AUTO_REFRESH_MS);
 }
 
 function initUI() {
@@ -102,7 +96,8 @@ function initUI() {
   setEl('hero-tag', sec ? 'SECRETARIO DE COMUNICACIONES · CELIDER' : 'CREATOR · CELIDER');
 
   renderDistritoHeader();
-  renderMyScore('PE1'); renderRankingDistritos('PE1'); renderDistrito('PE1');
+  renderMyScore(mPE); renderPEDates(mPE,'tab-miscore');
+  renderRankingDistritos(dPE); renderDistrito(rPE);
   renderRubrica(); renderTablaEvaluacion(); renderCalendario(); updateTimestamp();
   initScrollEffects();
 }
@@ -118,11 +113,32 @@ function renderDistritoHeader() {
   el.innerHTML = `<div class="distrito-title-block"><div class="distrito-label">TU DISTRITO</div><div class="distrito-nombre">${nombre}</div></div>`;
 }
 
+/* ── PE DATES ── */
+function renderPEDates(pe, tabId) {
+  const p = D?.periodos?.find(x => x.pe === pe);
+  const infoId = `pe-dates-info${tabId?'-'+tabId:''}`;
+  let el = document.getElementById(infoId);
+  if (!el) {
+    const peRow = document.querySelector(`#${tabId||'tab-miscore'} .pe-row`);
+    if (!peRow) return;
+    el = document.createElement('div');
+    el.id = infoId;
+    el.className = 'pe-dates-info';
+    peRow.insertAdjacentElement('afterend', el);
+  }
+  if (!p) { el.innerHTML = ''; return; }
+  const items = [['Inicio',p.inicio],['Fin trabajo',p.finTrabajo],['Entrega',p.entrega],['Jornada',p.jornada]].filter(([,v])=>v);
+  const estadoCls = (p.estado||'').toLowerCase().replace(/\s+/g,'-');
+  el.innerHTML = `<span class="pe-dates-nombre">${p.nombre||p.pe}</span>` +
+    items.map(([l,v])=>`<span class="pe-dates-item"><span class="pe-dates-lbl">${l}:</span> ${v}</span>`).join('') +
+    (p.estado?`<span class="pe-dates-estado pe-estado--${estadoCls}">${p.estado}</span>`:'');
+}
+
 /* ── MI SCORE ── */
 function selectPE(pe, btn) {
   mPE = pe;
   document.querySelectorAll('#tab-miscore .pe-row .pb').forEach(b=>b.classList.remove('active'));
-  btn.classList.add('active'); setEl('hero-pe',pe); renderMyScore(pe);
+  btn.classList.add('active'); setEl('hero-pe',pe); renderPEDates(pe,'tab-miscore'); renderMyScore(pe);
 }
 
 function renderMyScore(pe) {
@@ -142,7 +158,7 @@ function renderMyScore(pe) {
   setEl('hero-max', MAX_TOTAL());
 
   if (!myScore) {
-    container.innerHTML=`<div class="no-data-msg"><div class="no-data-icon">📊</div><div class="no-data-txt">Aún no hay evaluación para <strong>${pe}</strong>.</div></div>`;
+    container.innerHTML=`<div class="no-data-msg"><div class="no-data-icon">${ICONS.score}</div><div class="no-data-txt">Aún no hay evaluación para <strong>${pe}</strong>.</div></div>`;
     return;
   }
 
@@ -153,7 +169,7 @@ function renderMyScore(pe) {
       <div class="cbar-top"><div><div class="cbar-tag" style="color:${c.color}">${c.abbr}</div><div class="cbar-name">${c.label}</div></div>
       <div class="cbar-val" style="color:${c.color}">${val}<span>/4</span></div></div>
       <div class="cbar-track"><div class="cbar-fill" style="width:${(val/4)*100}%;background:${c.color}"></div></div>
-      ${critFb?`<div class="cbar-feedback"><span class="cbar-fb-icon">💬</span><span class="cbar-fb-txt">${critFb}</span></div>`:''}
+      ${critFb?`<div class="cbar-feedback"><span class="cbar-fb-icon">${ICONS.msg}</span><span class="cbar-fb-txt">${critFb}</span></div>`:''}
     </div>`;
   }).join('');
 
@@ -163,7 +179,7 @@ function renderMyScore(pe) {
         <div class="sse-label">Puntaje total — ${pe}</div>
         <div class="sse-name">${CU.name||CU.user}</div>
         <div class="sse-role">${isSecretario()?'Secretario':'Creator'} · ${getMyDistrito()||'Sin distrito'}</div>
-        ${ext>0?`<div style="margin-top:8px"><span class="bono-badge"><span class="bono-icon">⭐</span>Bono +${ext}</span></div>`:''}
+        ${ext>0?`<div style="margin-top:8px"><span class="bono-badge"><span class="bono-icon">${ICONS.star}</span>Bono +${ext}</span></div>`:''}
       </div>
       <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
         <span class="nivel-badge ${scoreClass(total)}">${scoreLabel(total)}</span>
@@ -216,7 +232,7 @@ function renderRankingDistritos(pe) {
   const myDistrito = getMyDistrito();
 
   if (!districts.length) {
-    el.innerHTML=`<div class="empty-box"><div class="empty-icon">🏆</div><div class="empty-txt">Sin datos de ranking para ${pe}.</div></div>`;
+    el.innerHTML=`<div class="empty-box"><div class="empty-icon">${ICONS.trophy}</div><div class="empty-txt">Sin datos de ranking para ${pe}.</div></div>`;
     return;
   }
 
@@ -284,7 +300,7 @@ function renderRankingDistritos(pe) {
             <div class="dist-rk-score dist-rk-blur">●●●</div>
           </div>
         </div>
-        <div class="dist-rk-lock-msg">🔒 Información confidencial</div>
+        <div class="dist-rk-lock-msg">${ICONS.lock} Información confidencial</div>
       </div>`;
     }
   }).join('');
@@ -364,7 +380,7 @@ function renderMiembrosDistrito(pe) {
   const el=document.getElementById('distrito-members'); if(!el) return;
   const rows=getDistritoRows(pe), fbs=D?.feedback?.[pe]||[], criterios=getCriterios();
   if (!rows.length) {
-    el.innerHTML=`<div class="empty-box"><div class="empty-icon">👥</div><div class="empty-txt">No hay miembros en tu distrito para ${pe}.</div></div>`;
+    el.innerHTML=`<div class="empty-box"><div class="empty-icon">${ICONS.users}</div><div class="empty-txt">No hay miembros en tu distrito para ${pe}.</div></div>`;
     return;
   }
   const sorted=[...rows].sort((a,b)=>calcScore(b)-calcScore(a));
@@ -388,7 +404,7 @@ function renderMiembrosDistrito(pe) {
           <div class="dm-score-total" style="color:${scoreColor(s)}">${s}</div>
           <div class="dm-score-max">/ ${MAX_TOTAL()}</div>
           <span class="nivel-badge ${scoreClass(s)}" style="font-size:.55rem;padding:3px 8px">${scoreLabel(s)}</span>
-          ${ext>0?`<span class="bono-badge" style="font-size:.55rem;padding:3px 8px;margin-top:4px"><span class="bono-icon">⭐</span>+${ext}</span>`:''}
+          ${ext>0?`<span class="bono-badge" style="font-size:.55rem;padding:3px 8px;margin-top:4px"><span class="bono-icon">${ICONS.star}</span>+${ext}</span>`:''}
         </div>
       </div>
       <div class="dm-crit-bars">${critBars}</div>
@@ -401,7 +417,7 @@ function renderMiembrosDistrito(pe) {
 function renderRubrica() {
   const el=document.getElementById('rubrica-grid'); if(!el) return;
   const rubrica=D?.rubrica||[], criterios=getCriterios();
-  if (!rubrica.length) { el.innerHTML='<div class="empty-box"><div class="empty-icon">📋</div><div class="empty-txt">Rúbrica no disponible.</div></div>'; return; }
+  if (!rubrica.length) { el.innerHTML=`<div class="empty-box"><div class="empty-icon">${ICONS.clipboard}</div><div class="empty-txt">Rúbrica no disponible.</div></div>`; return; }
   const levels=[{n:4,lbl:'Excelente',color:'var(--green)'},{n:3,lbl:'Bueno',color:'var(--blue)'},{n:2,lbl:'En Proceso',color:'var(--gold)'},{n:1,lbl:'Bajo',color:'var(--red)'}];
   const lk={4:'nivel4',3:'nivel3',2:'nivel2',1:'nivel1'};
   el.innerHTML=rubrica.map((r,i)=>{const c=criterios[i]||{},color=c.color||'#888';return `<div class="rubrica-card" id="rc-${i}"><div class="rubrica-card-head" onclick="document.getElementById('rc-${i}').classList.toggle('open')"><div class="rubrica-dot" style="background:${color}"></div><div class="rubrica-title" style="color:${color}">${r.criterio}</div><span class="rubrica-chev">▾</span></div><div class="rubrica-body"><div class="rubrica-levels">${levels.map(l=>`<div class="rlevel"><div class="rlevel-badge" style="color:${l.color}">${l.n}</div><div class="rlevel-lbl" style="color:${l.color}">${l.lbl}</div><div class="rlevel-desc">${r[lk[l.n]]||'—'}</div></div>`).join('')}</div></div></div>`;}).join('');
@@ -429,7 +445,7 @@ function renderTablaEvaluacion() {
 function _renderRubricaGrid(elId, rubrica, criterios) {
   const el = document.getElementById(elId); if (!el) return;
   if (!rubrica.length) {
-    el.innerHTML='<div class="empty-box"><div class="empty-icon">📋</div><div class="empty-txt">Rúbrica no disponible aún.</div></div>';
+    el.innerHTML=`<div class="empty-box"><div class="empty-icon">${ICONS.clipboard}</div><div class="empty-txt">Rúbrica no disponible aún.</div></div>`;
     return;
   }
   const levels=[{n:4,lbl:'Excelente',color:'var(--green)'},{n:3,lbl:'Bueno',color:'var(--blue)'},{n:2,lbl:'En Proceso',color:'var(--gold)'},{n:1,lbl:'Bajo',color:'var(--red)'}];
@@ -459,7 +475,7 @@ function _renderRubricaGrid(elId, rubrica, criterios) {
 function renderCalendario() {
   const el=document.getElementById('cal-grid'); if(!el) return;
   const cal=D?.calendario||[];
-  if (!cal.length) { el.innerHTML='<div class="empty-box" style="grid-column:1/-1"><div class="empty-icon">📅</div><div class="empty-txt">No hay eventos disponibles.</div></div>'; return; }
+  if (!cal.length) { el.innerHTML=`<div class="empty-box" style="grid-column:1/-1"><div class="empty-icon">${ICONS.calendar}</div><div class="empty-txt">No hay eventos disponibles.</div></div>`; return; }
   const cAcc={rojo:'cal-acc--rojo',verde:'cal-acc--verde',azul:'cal-acc--azul',amarillo:'cal-acc--amarillo'};
   const cT={rojo:'cal-t--rojo',verde:'cal-t--verde',azul:'cal-t--azul',amarillo:'cal-t--amarillo'};
   const emap={'en curso':{cls:'sa',dot:true,txt:'En curso'},'próximo':{cls:'sp',dot:true,txt:'Próximo'},'proximo':{cls:'sp',dot:true,txt:'Próximo'},'pendiente':{cls:'spe',dot:false,txt:'Pendiente'},'completado':{cls:'spe',dot:false,txt:'Completado'}};

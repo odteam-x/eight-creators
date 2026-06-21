@@ -3,7 +3,7 @@
  */
 'use strict';
 
-let CU = null, D = null, mPE = 'PE1', _arTimer = null, _lastUpdated = null, _menuOpen = false;
+let CU = null, D = null, mPE = 'PE1', _arTimer = null, _lastUpdated = null, _menuOpen = false, _peInited = false;
 
 const CRITERIOS_DEFAULT = [
   { key:'pla', label:'Planificación',       abbr:'PLA', color:'#E05A6A' },
@@ -29,24 +29,25 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   await loadData();
   initUI();
-  startAutoRefresh();
 });
 
 async function loadData() {
   try {
     const data = await API.getData();
-    if (data.ok !== false) { D = data; Auth.setCachedData(data); _lastUpdated = new Date(); }
+    if (data.ok !== false) {
+      D = data;
+      Auth.setCachedData(data);
+      _lastUpdated = new Date();
+      if (!_peInited && data.config?.periodoActivo) {
+        mPE = data.config.periodoActivo;
+        _peInited = true;
+        document.querySelectorAll('.pe-row .pb').forEach((b,i) => {
+          b.classList.toggle('active', ['PE1','PE2','PE3'][i] === mPE);
+        });
+        setEl('hero-pe', mPE);
+      }
+    }
   } catch (e) { console.error('[User]', e); }
-}
-
-function startAutoRefresh() {
-  if (_arTimer) clearInterval(_arTimer);
-  _arTimer = setInterval(async () => {
-    await loadData();
-    renderScores(mPE);
-    renderCalendario();
-    updateTimestamp();
-  }, PORTAL_CONFIG.AUTO_REFRESH_MS);
 }
 
 function initUI() {
@@ -56,11 +57,32 @@ function initUI() {
   setEl('av-desktop', ini); setEl('av-mobile', ini);
   setEl('uname-desktop', name); setEl('uname-mobile', name);
   setEl('hero-name', name);
-  renderScores('PE1');
+  renderScores(mPE);
+  renderPEDates(mPE);
   renderRubrica();
   renderCalendario();
   updateTimestamp();
   initScrollEffects();
+}
+
+/* ── PE DATES ── */
+function renderPEDates(pe) {
+  const p = D?.periodos?.find(x => x.pe === pe);
+  let el = document.getElementById('pe-dates-info');
+  if (!el) {
+    const peRow = document.querySelector('#tab-scores .pe-row');
+    if (!peRow) return;
+    el = document.createElement('div');
+    el.id = 'pe-dates-info';
+    el.className = 'pe-dates-info';
+    peRow.insertAdjacentElement('afterend', el);
+  }
+  if (!p) { el.innerHTML = ''; return; }
+  const items = [['Inicio',p.inicio],['Fin trabajo',p.finTrabajo],['Entrega',p.entrega],['Jornada',p.jornada]].filter(([,v])=>v);
+  const estadoCls = (p.estado||'').toLowerCase().replace(/\s+/g,'-');
+  el.innerHTML = `<span class="pe-dates-nombre">${p.nombre||p.pe}</span>` +
+    items.map(([l,v])=>`<span class="pe-dates-item"><span class="pe-dates-lbl">${l}:</span> ${v}</span>`).join('') +
+    (p.estado?`<span class="pe-dates-estado pe-estado--${estadoCls}">${p.estado}</span>`:'');
 }
 
 /* ── SCORES ── */
@@ -69,6 +91,7 @@ function selectPE(pe, btn) {
   document.querySelectorAll('.pe-row .pb').forEach(b => b.classList.remove('active'));
   btn.classList.add('active');
   setEl('hero-pe', pe);
+  renderPEDates(pe);
   renderScores(pe);
 }
 
@@ -99,7 +122,7 @@ function renderScores(pe) {
   if (!myScore) {
     container.innerHTML = `
       <div class="no-data-msg">
-        <div class="no-data-icon">📊</div>
+        <div class="no-data-icon">${ICONS.score}</div>
         <div class="no-data-txt">Aún no hay evaluación para <strong>${pe}</strong>.<br>Consulta más adelante.</div>
       </div>`;
     return;
@@ -123,7 +146,7 @@ function renderScores(pe) {
         <div class="cbar-track">
           <div class="cbar-fill" style="width:${(val/4)*100}%;background:${c.color}"></div>
         </div>
-        ${critFb ? `<div class="cbar-feedback"><span class="cbar-fb-icon">💬</span><span class="cbar-fb-txt">${critFb}</span></div>` : ''}
+        ${critFb ? `<div class="cbar-feedback"><span class="cbar-fb-icon">${ICONS.msg}</span><span class="cbar-fb-txt">${critFb}</span></div>` : ''}
       </div>`;
   }).join('');
 
@@ -133,7 +156,7 @@ function renderScores(pe) {
         <div class="sse-label">Puntaje total — ${pe}</div>
         <div class="sse-name">${CU.name || CU.user}</div>
         ${myScore.area ? `<div class="sse-role">Área: ${myScore.area}</div>` : ''}
-        ${ext > 0 ? `<div style="margin-top:8px"><span class="bono-badge"><span class="bono-icon">⭐</span>Bono de excelencia +${ext}</span></div>` : ''}
+        ${ext > 0 ? `<div style="margin-top:8px"><span class="bono-badge"><span class="bono-icon">${ICONS.star}</span>Bono de excelencia +${ext}</span></div>` : ''}
       </div>
       <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
         <span class="nivel-badge ${scoreClass(total)}">${scoreLabel(total)}</span>
@@ -151,7 +174,7 @@ function renderRubrica() {
   const el = document.getElementById('rubrica-grid'); if (!el) return;
   const rubrica   = D?.rubrica || [];
   const criterios = getCriterios();
-  if (!rubrica.length) { el.innerHTML = '<div class="empty-box"><div class="empty-icon">📋</div><div class="empty-txt">Rúbrica no disponible.</div></div>'; return; }
+  if (!rubrica.length) { el.innerHTML = `<div class="empty-box"><div class="empty-icon">${ICONS.clipboard}</div><div class="empty-txt">Rúbrica no disponible.</div></div>`; return; }
   const levels = [{n:4,lbl:'Excelente',color:'var(--green)'},{n:3,lbl:'Bueno',color:'var(--blue)'},{n:2,lbl:'En Proceso',color:'var(--gold)'},{n:1,lbl:'Bajo',color:'var(--red)'}];
   const lk = {4:'nivel4',3:'nivel3',2:'nivel2',1:'nivel1'};
   el.innerHTML = rubrica.map((r,i) => {
@@ -176,7 +199,7 @@ function renderRubrica() {
 function renderCalendario() {
   const el = document.getElementById('cal-grid'); if (!el) return;
   const cal = D?.calendario || [];
-  if (!cal.length) { el.innerHTML = '<div class="empty-box" style="grid-column:1/-1"><div class="empty-icon">📅</div><div class="empty-txt">No hay eventos disponibles.</div></div>'; return; }
+  if (!cal.length) { el.innerHTML = `<div class="empty-box" style="grid-column:1/-1"><div class="empty-icon">${ICONS.calendar}</div><div class="empty-txt">No hay eventos disponibles.</div></div>`; return; }
   const cAcc = {rojo:'cal-acc--rojo',verde:'cal-acc--verde',azul:'cal-acc--azul',amarillo:'cal-acc--amarillo'};
   const cT   = {rojo:'cal-t--rojo',verde:'cal-t--verde',azul:'cal-t--azul',amarillo:'cal-t--amarillo'};
   const emap = {'en curso':{cls:'sa',dot:true,txt:'En curso'},'próximo':{cls:'sp',dot:true,txt:'Próximo'},'proximo':{cls:'sp',dot:true,txt:'Próximo'},'pendiente':{cls:'spe',dot:false,txt:'Pendiente'},'completado':{cls:'spe',dot:false,txt:'Completado'}};
