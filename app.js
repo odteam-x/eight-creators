@@ -28,7 +28,7 @@
 
 'use strict';
 
-const SID              = '1ZDj4OvA1lkdUKTU-hU24CY34CKekZKb_i0oGlcWNCdo';
+const SID              = '1FQiY64mpQdErTXz2pVASijs5LeCTNwH5gnikNVEmPB4';
 const AUTO_REFRESH_MS  = 60_000;
 
 let D = {

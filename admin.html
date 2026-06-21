@@ -3,11 +3,11 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-  <meta name="theme-color" content="#080A0F">
+  <meta name="theme-color" content="#002247">
   <title>EIGHT CREATORS LABs — Admin</title>
   <link rel="icon" type="image/x-icon" href="icono.ico">
   <link rel="apple-touch-icon" href="logo.png">
-  <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Barlow+Condensed:wght@300;400;600;700;900&family=Barlow:wght@300;400;500;600&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Barlow+Condensed:wght@300;400;600;700;900&family=Barlow:wght@300;400;500;600&family=Source+Sans+3:wght@300;400;600;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="shared.css">
   <link rel="stylesheet" href="admin.css">
 </head>
@@ -35,13 +35,19 @@
     <button class="tnav"        onclick="switchTab('miembros',this)">Miembros</button>
     <button class="tnav"        onclick="switchTab('rubrica',this)">Rúbrica</button>
     <button class="tnav"                           onclick="switchTab('calendario',this)">Calendario</button>
-    <button class="tnav" style="color:var(--cyan)"  onclick="switchTab('config',this)">⚙ Config</button>
-    <button class="tnav" style="color:var(--gold)" onclick="switchTab('debug',this)">🔍</button>
+    <button class="tnav" style="color:var(--cyan)"  onclick="switchTab('config',this)"><i data-lucide="settings" class="nav-icon"></i> Config</button>
+    <button class="tnav" style="color:var(--gold)" onclick="switchTab('debug',this)"><i data-lucide="search" class="nav-icon"></i></button>
   </nav>
   <div class="tb-user">
+    <button class="btn-refresh" id="btn-refresh" onclick="handleRefresh()">
+      <svg class="refresh-icon" viewBox="0 0 16 16" fill="none"><path d="M13.65 2.35A8 8 0 1 0 15 8h-1.5A6.5 6.5 0 1 1 8 1.5a6.44 6.44 0 0 1 4.59 1.91L10.5 5.5H15V1l-1.35 1.35z" fill="currentColor"/></svg>
+      Actualizar
+    </button>
+    <span class="last-updated-badge" id="ts-badge"></span>
     <div class="avatar admin-av">A</div>
     <span class="uname">ADMIN</span>
     <button class="btn-out" onclick="logout()">Salir</button>
+    <button class="theme-toggle" id="theme-toggle" onclick="toggleTheme()" aria-label="Cambiar tema"><i data-lucide="sun" class="icon-sun"></i><i data-lucide="moon" class="icon-moon"></i><span class="theme-icon" hidden></span></button>
   </div>
   <button class="hamburger" id="hamburger" aria-label="Menú" aria-expanded="false" onclick="toggleMenu()">
     <span></span><span></span><span></span>
@@ -51,15 +57,19 @@
 <!-- MOBILE MENU -->
 <div class="mobile-menu" id="mobile-menu">
   <div class="mobile-nav-links">
-    <button class="mobile-nav-btn active" onclick="switchTabMobile('overview',this)">📊 &nbsp;Overview</button>
-    <button class="mobile-nav-btn"        onclick="switchTabMobile('ranking',this)">🏆 &nbsp;Ranking</button>
-    <button class="mobile-nav-btn"        onclick="switchTabMobile('criterios',this)">📈 &nbsp;Criterios</button>
-    <button class="mobile-nav-btn"        onclick="switchTabMobile('distritos',this)">🗺️ &nbsp;Distritos</button>
-    <button class="mobile-nav-btn"        onclick="switchTabMobile('miembros',this)">👥 &nbsp;Miembros</button>
-    <button class="mobile-nav-btn"        onclick="switchTabMobile('rubrica',this)">📋 &nbsp;Rúbrica</button>
-    <button class="mobile-nav-btn"                           onclick="switchTabMobile('calendario',this)">📅 &nbsp;Calendario</button>
-    <button class="mobile-nav-btn" style="color:var(--cyan)" onclick="switchTabMobile('config',this)">⚙️ &nbsp;Configuración</button>
-    <button class="mobile-nav-btn" style="color:var(--gold)" onclick="switchTabMobile('debug',this)">🔍 &nbsp;Diagnóstico</button>
+    <button class="mobile-nav-btn active" onclick="switchTabMobile('overview',this)"><i data-lucide="bar-chart-2" class="nav-icon"></i>Overview</button>
+    <button class="mobile-nav-btn"        onclick="switchTabMobile('ranking',this)"><i data-lucide="trophy" class="nav-icon"></i>Ranking</button>
+    <button class="mobile-nav-btn"        onclick="switchTabMobile('criterios',this)"><i data-lucide="trending-up" class="nav-icon"></i>Criterios</button>
+    <button class="mobile-nav-btn"        onclick="switchTabMobile('distritos',this)"><i data-lucide="map" class="nav-icon"></i>Distritos</button>
+    <button class="mobile-nav-btn"        onclick="switchTabMobile('miembros',this)"><i data-lucide="users" class="nav-icon"></i>Miembros</button>
+    <button class="mobile-nav-btn"        onclick="switchTabMobile('rubrica',this)"><i data-lucide="clipboard-list" class="nav-icon"></i>Rúbrica</button>
+    <button class="mobile-nav-btn"                           onclick="switchTabMobile('calendario',this)"><i data-lucide="calendar" class="nav-icon"></i>Calendario</button>
+    <button class="mobile-nav-btn" style="color:var(--cyan)" onclick="switchTabMobile('config',this)"><i data-lucide="settings" class="nav-icon"></i>Configuración</button>
+    <button class="mobile-nav-btn" style="color:var(--gold)" onclick="switchTabMobile('debug',this)"><i data-lucide="search" class="nav-icon"></i>Diagnóstico</button>
+    <div class="mobile-theme-row">
+      <span class="mobile-theme-lbl">Tema</span>
+      <button class="theme-toggle" onclick="toggleTheme()" aria-label="Cambiar tema"><i data-lucide="sun" class="icon-sun"></i><i data-lucide="moon" class="icon-moon"></i><span class="theme-icon" hidden></span></button>
+    </div>
     <button class="mobile-nav-btn mobile-nav-btn--refresh" onclick="handleRefresh();closeMenu()">
       <svg class="refresh-icon" viewBox="0 0 16 16" fill="none"><path d="M13.65 2.35A8 8 0 1 0 15 8h-1.5A6.5 6.5 0 1 1 8 1.5a6.44 6.44 0 0 1 4.59 1.91L10.5 5.5H15V1l-1.35 1.35z" fill="currentColor"/></svg>
       &nbsp;Actualizar datos
@@ -79,26 +89,18 @@
 <!-- CONTENIDO ADMIN -->
 <div class="amain">
 
-  <!-- Barra PE + refresh -->
-  <div class="admin-pe-bar">
-    <span class="admin-pe-lbl">Período:</span>
-    <div class="pe-row pe-row--no-mb">
-      <button class="pb active" onclick="selectPE('PE1',this)">PE1</button>
-      <button class="pb"        onclick="selectPE('PE2',this)">PE2</button>
-      <button class="pb"        onclick="selectPE('PE3',this)">PE3</button>
-    </div>
-    <div style="flex:1"></div>
-    <span class="last-updated-badge" id="ts-badge"></span>
-    <button class="btn-refresh" id="btn-refresh" onclick="handleRefresh()">
-      <svg class="refresh-icon" viewBox="0 0 16 16" fill="none"><path d="M13.65 2.35A8 8 0 1 0 15 8h-1.5A6.5 6.5 0 1 1 8 1.5a6.44 6.44 0 0 1 4.59 1.91L10.5 5.5H15V1l-1.35 1.35z" fill="currentColor"/></svg>
-      Actualizar
-      <span class="auto-refresh-dot" title="Auto-refresh cada 60s"></span>
-    </button>
-  </div>
-
   <!-- OVERVIEW -->
   <div id="tab-overview" class="atab-content active">
     <div class="ptitle">OVERVIEW — <span id="ov-pe">PE1</span></div>
+    <div class="admin-pe-bar">
+      <span class="admin-pe-lbl">Período:</span>
+      <div class="pe-row pe-row--no-mb">
+        <button class="pb active" onclick="selectPE('PE1',this)">PE1</button>
+        <button class="pb"        onclick="selectPE('PE2',this)">PE2</button>
+        <button class="pb"        onclick="selectPE('PE3',this)">PE3</button>
+      </div>
+    </div>
+    <div id="pe-dates-info" class="pe-dates-info"></div>
     <div class="stat-cards" id="ov-stats"><div class="loading-box"><span class="spin"></span></div></div>
     <div id="ov-top5"></div>
     <div class="two-col-grid">
@@ -116,18 +118,42 @@
   <!-- RANKING -->
   <div id="tab-ranking" class="atab-content">
     <div class="ptitle">RANKING — <span id="rk-pe">PE1</span></div>
+    <div class="admin-pe-bar">
+      <span class="admin-pe-lbl">Período:</span>
+      <div class="pe-row pe-row--no-mb">
+        <button class="pb active" onclick="selectPE('PE1',this)">PE1</button>
+        <button class="pb"        onclick="selectPE('PE2',this)">PE2</button>
+        <button class="pb"        onclick="selectPE('PE3',this)">PE3</button>
+      </div>
+    </div>
     <div class="tbl" id="ranking-tbl"></div>
   </div>
 
   <!-- CRITERIOS -->
   <div id="tab-criterios" class="atab-content">
     <div class="ptitle">ANÁLISIS POR CRITERIO — <span id="cr-pe">PE1</span></div>
+    <div class="admin-pe-bar">
+      <span class="admin-pe-lbl">Período:</span>
+      <div class="pe-row pe-row--no-mb">
+        <button class="pb active" onclick="selectPE('PE1',this)">PE1</button>
+        <button class="pb"        onclick="selectPE('PE2',this)">PE2</button>
+        <button class="pb"        onclick="selectPE('PE3',this)">PE3</button>
+      </div>
+    </div>
     <div class="crit-detail-grid" id="crit-grid"></div>
   </div>
 
   <!-- DISTRITOS -->
   <div id="tab-distritos" class="atab-content">
     <div class="ptitle">RANKING DE DISTRITOS — <span id="dist-admin-pe">PE1</span></div>
+    <div class="admin-pe-bar">
+      <span class="admin-pe-lbl">Período:</span>
+      <div class="pe-row pe-row--no-mb">
+        <button class="pb active" onclick="selectPE('PE1',this)">PE1</button>
+        <button class="pb"        onclick="selectPE('PE2',this)">PE2</button>
+        <button class="pb"        onclick="selectPE('PE3',this)">PE3</button>
+      </div>
+    </div>
     <div class="stat-cards" id="dist-admin-stats"></div>
     <div id="dist-admin-list"></div>
   </div>
@@ -150,8 +176,8 @@
     <div class="eval-toggle-bar">
       <span class="eval-toggle-lbl">Calificar:</span>
       <div class="eval-toggle-btns">
-        <button class="eval-toggle-btn active" id="etb-creators" onclick="setEvalMode('creators')">👤 Creators</button>
-        <button class="eval-toggle-btn"         id="etb-distritos" onclick="setEvalMode('distritos')">🗺️ Distritos</button>
+        <button class="eval-toggle-btn active" id="etb-creators" onclick="setEvalMode('creators')"><i data-lucide="user" class="nav-icon"></i> Creators</button>
+        <button class="eval-toggle-btn"         id="etb-distritos" onclick="setEvalMode('distritos')"><i data-lucide="map" class="nav-icon"></i> Distritos</button>
       </div>
     </div>
 
@@ -172,8 +198,8 @@
     <div class="ptitle">TABLA DE PUNTUACIÓN</div>
 
     <div class="cfg-toggle-bar">
-      <button class="cfg-toggle-btn active" id="rtb-creators" onclick="setRubricaAdminMode('creators',this)">👤 Creators</button>
-      <button class="cfg-toggle-btn"        id="rtb-distritos" onclick="setRubricaAdminMode('distritos',this)">🗺️ Distritos</button>
+      <button class="cfg-toggle-btn active" id="rtb-creators" onclick="setRubricaAdminMode('creators',this)"><i data-lucide="user" class="nav-icon"></i> Creators</button>
+      <button class="cfg-toggle-btn"        id="rtb-distritos" onclick="setRubricaAdminMode('distritos',this)"><i data-lucide="map" class="nav-icon"></i> Distritos</button>
     </div>
 
     <!-- Creators -->
@@ -209,8 +235,9 @@
 
     <!-- Sub-tabs -->
     <div class="cfg-subtabs">
-      <button class="cfg-subtab active" id="cst-criterios"  onclick="switchConfigTab('criterios',this)">📐 Criterios</button>
-      <button class="cfg-subtab"        id="cst-usuarios"   onclick="switchConfigTab('usuarios',this)">👥 Usuarios</button>
+      <button class="cfg-subtab active" id="cst-criterios"  onclick="switchConfigTab('criterios',this)"><i data-lucide="ruler" class="nav-icon"></i> Criterios</button>
+      <button class="cfg-subtab"        id="cst-usuarios"   onclick="switchConfigTab('usuarios',this)"><i data-lucide="users" class="nav-icon"></i> Usuarios</button>
+      <button class="cfg-subtab"        id="cst-periodos"   onclick="switchConfigTab('periodos',this)"><i data-lucide="calendar" class="nav-icon"></i> Períodos</button>
     </div>
 
     <!-- Panel: Criterios -->
@@ -240,6 +267,26 @@
       </div>
       <div id="usuarios-editor"></div>
     </div>
+
+    <!-- Panel: Períodos -->
+    <div id="cfg-panel-periodos" style="display:none">
+      <div class="cfg-toolbar">
+        <p class="cfg-hint">Configura los períodos de evaluación. Los cambios se aplican inmediatamente al guardar.</p>
+        <button class="btn-cfg-add" onclick="addPeriodoRow()">+ Agregar período</button>
+        <div style="flex:1"></div>
+        <button class="btn-save btn-save-cfg hidden" id="btn-save-periodos" onclick="savePeriodosAdmin()">
+          <svg viewBox="0 0 16 16" width="14" height="14" fill="none"><path d="M13.5 4.5L6 12 2.5 8.5" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+          Guardar períodos
+        </button>
+      </div>
+      <!-- Selector de período activo -->
+      <div class="cfg-periodo-activo-bar">
+        <span class="cfg-periodo-activo-lbl">Período activo:</span>
+        <select class="cfg-inp cfg-select" id="pa-select" onchange="setPeriodoActivo(this.value)"></select>
+        <span class="cfg-periodo-activo-hint">Los usuarios verán este período al ingresar</span>
+      </div>
+      <div id="periodos-editor"></div>
+    </div>
   </div>
 
   <!-- CALENDARIO -->
@@ -268,5 +315,18 @@
 <script src="api.js"></script>
 <script src="auth.js"></script>
 <script src="admin.js"></script>
+<script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js"></script>
+<script>
+(function(){
+  var R=document.documentElement,K='ec-theme';
+  function apply(t){
+    R.dataset.theme=t;
+  }
+  window.toggleTheme=function(){var n=R.dataset.theme==='light'?'dark':'light';localStorage.setItem(K,n);apply(n);};
+  var s=localStorage.getItem(K);
+  if(s){apply(s);}else if(window.matchMedia('(prefers-color-scheme:light)').matches){apply('light');}
+  if(typeof lucide!=='undefined')lucide.createIcons();
+})();
+</script>
 </body>
 </html>

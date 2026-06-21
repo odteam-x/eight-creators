@@ -3,7 +3,7 @@
  */
 'use strict';
 
-let CU=null, D=null, aPE='PE1', aMember=null, _arTimer=null, _lastUpdated=null, _menuOpen=false;
+let CU=null, D=null, aPE='PE1', aMember=null, _arTimer=null, _lastUpdated=null, _menuOpen=false, _periodsInited=false;
 let _evalMode='creators', _pendingDistScores={};
 let _pendingScores={}, _pendingFeedback={};
 
@@ -18,6 +18,7 @@ const CRITERIOS_DEFAULT = [
 ];
 
 const getCriterios = () => D?.criterios?.length ? D.criterios : CRITERIOS_DEFAULT;
+const getPE        = () => D?.periodos?.length ? D.periodos.map(p=>p.pe) : PORTAL_CONFIG.PERIODOS;
 const getMaxScore  = () => getCriterios().length * 4;
 const MAX_TOTAL    = () => getMaxScore() + 2;
 
@@ -29,7 +30,6 @@ document.addEventListener('DOMContentLoaded', async () => {
   if (cached) { D = cached; renderAll(); }
   await loadData();
   renderAll();
-  startAutoRefresh();
   initScrollEffects();
 });
 
@@ -40,13 +40,16 @@ async function loadData() {
   } catch(e) { console.error('[Admin]',e); }
 }
 
-function startAutoRefresh() {
-  if (_arTimer) clearInterval(_arTimer);
-  _arTimer = setInterval(async()=>{ await loadData(); renderAll(); },PORTAL_CONFIG.AUTO_REFRESH_MS);
-}
-
 function renderAll() {
   if (!D) return;
+  if (!_periodsInited && D?.config?.periodoActivo) {
+    aPE = D.config.periodoActivo;
+    _periodsInited = true;
+    document.querySelectorAll('.admin-pe-bar .pb').forEach((b,i) => {
+      b.classList.toggle('active', getPE()[i] === aPE);
+    });
+  }
+  renderPEDates();
   const rows = D.scores?.[aPE] || [];
   renderOverview(rows); renderRanking(rows); renderCriterios(rows);
   renderDistritosAdmin(rows);
@@ -151,13 +154,13 @@ function renderRanking(rows) {
   const tbl=document.getElementById('ranking-tbl'); if(!tbl) return;
   const criterios=getCriterios(), sorted=[...rows].sort((a,b)=>calcScore(b)-calcScore(a));
   const cols=`1fr 52px ${criterios.map(()=>'38px').join(' ')} 44px 72px`;
-  if (!sorted.length) { tbl.innerHTML='<div class="empty-box"><div class="empty-icon">🏆</div><div class="empty-txt">Sin datos</div></div>'; return; }
+  if (!sorted.length) { tbl.innerHTML=`<div class="empty-box"><div class="empty-icon">${ICONS.trophy}</div><div class="empty-txt">Sin datos</div></div>`; return; }
   tbl.innerHTML=`
     <div class="tbl-h" style="grid-template-columns:${cols};padding:8px 14px">
       <div class="tbl-th">Miembro</div>
       <div class="tbl-th" style="text-align:center">Pts</div>
       ${criterios.map(c=>`<div class="tbl-th" style="color:${c.color};text-align:center">${c.abbr}</div>`).join('')}
-      <div class="tbl-th" style="color:var(--gold);text-align:center">⭐</div>
+      <div class="tbl-th" style="color:var(--gold);text-align:center">${ICONS.star}</div>
       <div class="tbl-th" style="text-align:center">Estado</div>
     </div>
     ${sorted.map((r,i)=>{
@@ -200,7 +203,7 @@ function selectMember(usuario) {
 }
 function getAllMembers() {
   const s=new Set();
-  PORTAL_CONFIG.PERIODOS.forEach(pe=>(D?.scores?.[pe]||[]).forEach(r=>s.add(r.usuario)));
+  getPE().forEach(pe=>(D?.scores?.[pe]||[]).forEach(r=>s.add(r.usuario)));
   return [...s].sort();
 }
 
@@ -212,7 +215,7 @@ function renderMemberDetail(usuario) {
   const fRow=D?.feedback?.[aPE]?.find(r=>r.usuario===usuario);
   const nombre=sRow?.nombre||usuario, total=sRow?calcScore(sRow):null;
 
-  const peCards=PORTAL_CONFIG.PERIODOS.map(pe=>{
+  const peCards=getPE().map(pe=>{
     const d=D?.scores?.[pe]?.find(r=>r.usuario===usuario), s=d?calcScore(d):null;
     return `<div class="mpc-card"><div class="mpc-pe">${pe}</div><div class="mpc-score" style="color:${s!==null?scoreColor(s):'var(--muted)'}">${s!==null?s:'—'}</div><div class="mpc-label">${s!==null?`${scoreLabel(s)} / ${MAX}pts`:'Sin datos'}</div></div>`;
   }).join('');
@@ -227,7 +230,7 @@ function renderMemberDetail(usuario) {
         ${total!==null?`<div style="text-align:right">
           <div style="font-family:'Bebas Neue',sans-serif;font-size:2.2rem;color:${scoreColor(total)};line-height:1">${total}</div>
           <div style="font-size:.65rem;color:var(--muted)">/ ${MAX} pts · ${scoreLabel(total)}</div>
-          ${sRow?.ext>0?`<div style="margin-top:4px"><span class="bono-badge"><span class="bono-icon">⭐</span>Bono +${sRow.ext}</span></div>`:''}
+          ${sRow?.ext>0?`<div style="margin-top:4px"><span class="bono-badge"><span class="bono-icon">${ICONS.star}</span>Bono +${sRow.ext}</span></div>`:''}
         </div>`:''}
       </div>
       <div class="member-detail-body">
@@ -245,7 +248,7 @@ function renderMemberDetail(usuario) {
         </div>
 
         <div class="edit-section">
-          <div class="edit-section-header"><div class="edit-section-title">💬 &nbsp;Feedback — ${aPE}</div></div>
+          <div class="edit-section-header"><div class="edit-section-title">${ICONS.msg} Feedback — ${aPE}</div></div>
           ${renderFeedbackEditor(usuario, fRow)}
           <div class="save-bar hidden" id="save-bar-fb-${esc(usuario)}">
             <span class="save-bar-msg">⚠ Feedback sin guardar</span>
@@ -267,7 +270,7 @@ function renderScoreEditor(usuario, sRow) {
   const extVal = sRow.ext ?? 0;
   const bonoRow = `
     <tr style="background:rgba(240,192,64,.05);border-top:1px solid rgba(240,192,64,.2)">
-      <td><span style="display:inline-flex;align-items:center;gap:8px"><span style="font-size:.9rem">⭐</span><span style="color:var(--gold);font-weight:700">BONO</span> <span style="color:var(--muted)">Excelencia (+2 máx.)</span></span></td>
+      <td><span style="display:inline-flex;align-items:center;gap:8px">${ICONS.star}<span style="color:var(--gold);font-weight:700">BONO</span> <span style="color:var(--muted)">Excelencia (+2 máx.)</span></span></td>
       <td><input type="number" class="score-inp" style="border-color:rgba(240,192,64,.4);color:var(--gold)" data-usuario="${esc(usuario)}" data-criterio="ext" data-original="${extVal}" value="${extVal}" min="0" max="2" step="1" id="si-${esc(usuario)}-ext" onchange="onScoreChange(this)" oninput="onScoreChange(this)"></td>
     </tr>`;
   return `<div class="edit-table-wrap"><table class="edit-table"><thead><tr><th style="text-align:left">Criterio</th><th>Puntaje</th></tr></thead><tbody>${rows}${bonoRow}</tbody></table></div>`;
@@ -397,7 +400,7 @@ function renderRubricaEditor(mode) {
   ];
 
   if (!data.length) {
-    el.innerHTML = `<div class="empty-box"><div class="empty-icon">📋</div><div class="empty-txt">Sin datos. Agrega criterios con el botón de arriba.</div></div>`;
+    el.innerHTML = `<div class="empty-box"><div class="empty-icon">${ICONS.clipboard}</div><div class="empty-txt">Sin datos. Agrega criterios con el botón de arriba.</div></div>`;
     return;
   }
 
@@ -461,7 +464,7 @@ async function saveRubricaAdmin(mode) {
       showToast(`✓ Rúbrica de ${mode === 'creators' ? 'Creators' : 'Distritos'} guardada`, 'ok');
       _rubricaDirty[mode] = false;
       document.getElementById(btnId)?.classList.add('hidden');
-      await loadData();
+      await loadData(); renderAll();
     }
   } catch(e) { showToast('Error al guardar', 'error'); console.error(e); }
   finally {
@@ -488,11 +491,15 @@ function switchConfigTab(tab, btn) {
   btn?.classList.add('active');
   document.getElementById('cfg-panel-criterios').style.display = tab === 'criterios' ? '' : 'none';
   document.getElementById('cfg-panel-usuarios').style.display  = tab === 'usuarios'  ? '' : 'none';
+  const pPanel = document.getElementById('cfg-panel-periodos');
+  if (pPanel) pPanel.style.display = tab === 'periodos' ? '' : 'none';
+  if (tab === 'periodos') renderPeriodosEditor();
 }
 
 function renderConfig() {
-  if (!_critDirty) _criteriosEdit = (D?.criterios || getCriterios()).map(c => ({...c}));
-  if (!_userDirty) _usuariosEdit  = (D?.users     || []).map(u => ({...u}));
+  if (!_critDirty)    _criteriosEdit = (D?.criterios || getCriterios()).map(c => ({...c}));
+  if (!_userDirty)    _usuariosEdit  = (D?.users     || []).map(u => ({...u}));
+  if (!_periodosDirty && _configTab === 'periodos') renderPeriodosEditor();
   renderCriteriosEditor();
   renderUsuariosEditor();
 }
@@ -503,7 +510,7 @@ const PRESET_COLORS = ['#E05A6A','#38BDF8','#2ECC71','#5B7FFF','#C084FC','#F0C04
 function renderCriteriosEditor() {
   const el = document.getElementById('criterios-editor'); if (!el) return;
   if (!_criteriosEdit.length) {
-    el.innerHTML = `<div class="empty-box"><div class="empty-icon">📐</div><div class="empty-txt">Sin criterios. Agrega el primero.</div></div>`;
+    el.innerHTML = `<div class="empty-box"><div class="empty-icon">${ICONS.ruler}</div><div class="empty-txt">Sin criterios. Agrega el primero.</div></div>`;
     return;
   }
   el.innerHTML = _criteriosEdit.map((c, i) => `
@@ -586,7 +593,7 @@ const ROLES_OPTS = ['admin','secretario','miembro'];
 function renderUsuariosEditor() {
   const el = document.getElementById('usuarios-editor'); if (!el) return;
   if (!_usuariosEdit.length) {
-    el.innerHTML = `<div class="empty-box"><div class="empty-icon">👥</div><div class="empty-txt">Sin usuarios. Agrega el primero.</div></div>`;
+    el.innerHTML = `<div class="empty-box"><div class="empty-icon">${ICONS.users}</div><div class="empty-txt">Sin usuarios. Agrega el primero.</div></div>`;
     return;
   }
 
@@ -716,7 +723,7 @@ async function saveUsuariosAdmin() {
       showToast(`✓ ${r.saved} usuarios guardados`, 'ok');
       _userDirty = false;
       document.getElementById('btn-save-usuarios')?.classList.add('hidden');
-      await loadData(); renderConfig();
+      await loadData(); renderConfig(); renderAll();
     }
   } catch(e) { showToast('Error al guardar', 'error'); console.error(e); }
   finally {
@@ -738,7 +745,7 @@ function renderDistritosAdmin(rows) {
   // Garantiza que en PE2/PE3 se vean todos los miembros aunque no
   // tengan scores aún en ese período.
   const universalMap = {}; // { distrito: { usuario: rowInfo } }
-  PORTAL_CONFIG.PERIODOS.forEach(pe => {
+  getPE().forEach(pe => {
     (D?.scores?.[pe] || []).forEach(r => {
       const dist = String(r.distrito || '').trim();
       if (!dist) return;
@@ -794,7 +801,7 @@ function renderDistritosAdmin(rows) {
   if (!listEl) return;
 
   if (!districts.length) {
-    listEl.innerHTML = '<div class="empty-box"><div class="empty-icon">🗺️</div><div class="empty-txt">Sin datos de distritos para este período.</div></div>';
+    listEl.innerHTML = `<div class="empty-box"><div class="empty-icon">${ICONS.map}</div><div class="empty-txt">Sin datos de distritos para este período.</div></div>`;
     return;
   }
 
@@ -907,7 +914,7 @@ function renderDistrictEditor() {
   const distScores = D?.districtScores?.[aPE] || [];
 
   if (!distScores.length) {
-    el.innerHTML = `<div class="empty-box"><div class="empty-icon">🗺️</div><div class="empty-txt">Sin datos para ${aPE}.<br>Verifica que exista la hoja "CREATORS DISTRITOS - ${aPE}".</div></div>`;
+    el.innerHTML = `<div class="empty-box"><div class="empty-icon">${ICONS.map}</div><div class="empty-txt">Sin datos para ${aPE}.<br>Verifica que exista la hoja "CREATORS DISTRITOS - ${aPE}".</div></div>`;
     return;
   }
 
@@ -1006,7 +1013,7 @@ async function saveDistScores(distrito) {
         delete _pendingDistScores[`${c.pe}_${distrito}_${c.competencia}`];
       });
       showSaveBar(`dsb-${distId}`, false);
-      await loadData(); renderDistrictEditor();
+      await loadData(); renderAll();
     }
   } catch(e){ showToast('Error al guardar','error'); console.error(e); }
   finally { if(btn){btn.textContent='Guardar';btn.classList.remove('saving');} }
@@ -1044,7 +1051,7 @@ function renderCalendarioAdmin() {
 function renderCalEditorList() {
   const el = document.getElementById('cal-editor-list'); if (!el) return;
   if (!_calEventos.length) {
-    el.innerHTML = '<div class="empty-box"><div class="empty-icon">📅</div><div class="empty-txt">Sin actividades. Haz clic en "+ Agregar actividad" para crear la primera.</div></div>';
+    el.innerHTML = `<div class="empty-box"><div class="empty-icon">${ICONS.calendar}</div><div class="empty-txt">Sin actividades. Haz clic en "+ Agregar actividad" para crear la primera.</div></div>`;
     return;
   }
 
@@ -1140,7 +1147,7 @@ async function saveCalendarioAdmin() {
       _calDirty = false;
       updateCalSaveBtn();
       await loadData();
-      renderCalendarioAdmin();
+      renderAll();
     }
   } catch(e) { showToast('Error al guardar','error'); console.error(e); }
   finally { if(btn){ btn.innerHTML='<svg viewBox="0 0 16 16" width="14" height="14" fill="none"><path d="M13.5 4.5L6 12 2.5 8.5" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg> Guardar calendario'; btn.classList.remove('saving'); } }
@@ -1151,7 +1158,7 @@ function renderDebug() {
   const criterios=getCriterios(), isDefault=!(D?.criterios?.length);
   const mk=(t,v,col)=>`<div class="debug-card" style="border-color:${col}"><div class="debug-card-label">${t}</div><div class="debug-card-val" style="color:${col}">${v}</div></div>`;
   el.innerHTML=`
-    <div class="ptitle" style="color:var(--gold)">🔍 DIAGNÓSTICO</div>
+    <div class="ptitle" style="color:var(--gold)">DIAGNÓSTICO</div>
     <div class="debug-grid">
       ${mk('Usuarios',`${D?.users?.length||0} registros`,D?.users?.length?'var(--sex)':'var(--sba)')}
       ${mk('Criterios',isDefault?`Default (${criterios.length})`:`Hoja (${criterios.length})`,isDefault?'var(--gold)':'var(--sex)')}
@@ -1167,12 +1174,24 @@ function renderDebug() {
 }
 
 /* ── SELECCIÓN PE ── */
+function renderPEDates() {
+  const el = document.getElementById('pe-dates-info');
+  if (!el) return;
+  const p = D?.periodos?.find(p => p.pe === aPE);
+  if (!p) { el.innerHTML = ''; return; }
+  const items = [['Inicio',p.inicio],['Fin trabajo',p.finTrabajo],['Entrega',p.entrega],['Jornada',p.jornada]].filter(([,v])=>v);
+  const estadoCls = (p.estado||'').toLowerCase().replace(/\s+/g,'-');
+  el.innerHTML = `<span class="pe-dates-nombre">${p.nombre||p.pe}</span>` +
+    items.map(([l,v])=>`<span class="pe-dates-item"><span class="pe-dates-lbl">${l}:</span> ${v}</span>`).join('') +
+    (p.estado?`<span class="pe-dates-estado pe-estado--${estadoCls}">${p.estado}</span>`:'');
+}
+
 function selectPE(pe, btn) {
   aPE=pe; _pendingScores={}; _pendingFeedback={};
   document.querySelectorAll('.admin-pe-bar .pb').forEach(b=>b.classList.remove('active'));
   btn.classList.add('active');
-  // Sync the in-tab PE selector
   syncEvalPEButtons();
+  renderPEDates();
   renderAll();
 }
 
@@ -1182,7 +1201,7 @@ function selectEvalPE(pe, btn) {
   _pendingScores = {}; _pendingFeedback = {}; _pendingDistScores = {};
   // Sync the top PE bar
   const topBtns = document.querySelectorAll('.admin-pe-bar .pb');
-  PORTAL_CONFIG.PERIODOS.forEach((p, i) => topBtns[i]?.classList.toggle('active', p === pe));
+  getPE().forEach((p, i) => topBtns[i]?.classList.toggle('active', p === pe));
   // Update eval PE buttons
   document.querySelectorAll('#eval-pe-btns .pb').forEach(b => b.classList.remove('active'));
   btn.classList.add('active');
@@ -1197,7 +1216,7 @@ function selectEvalPE(pe, btn) {
 
 function syncEvalPEButtons() {
   const btns = document.querySelectorAll('#eval-pe-btns .pb');
-  PORTAL_CONFIG.PERIODOS.forEach((p, i) => btns[i]?.classList.toggle('active', p === aPE));
+  getPE().forEach((p, i) => btns[i]?.classList.toggle('active', p === aPE));
 }
 
 /* ── TABS ── */
@@ -1269,6 +1288,113 @@ function showToast(msg, type='') {
   setTimeout(()=>t.classList.remove('show'),3500);
 }
 function logout() { if(_arTimer) clearInterval(_arTimer); Auth.logout(); window.location.replace('index.html'); }
+/* ══════════════════════════════════════════════════════════════
+   PERÍODOS EDITOR — Admin
+   ══════════════════════════════════════════════════════════════ */
+
+let _periodosEdit  = [];
+let _periodosDirty = false;
+
+function renderPeriodosEditor() {
+  _periodosEdit  = (D?.periodos || []).map(p => ({...p}));
+  _periodosDirty = false;
+  document.getElementById('btn-save-periodos')?.classList.add('hidden');
+  _renderPeriodosTable();
+}
+
+function _renderPeriodosTable() {
+  const el = document.getElementById('periodos-editor'); if (!el) return;
+  // Actualizar selector de período activo
+  const paEl = document.getElementById('pa-select');
+  if (paEl) {
+    const curr = D?.config?.periodoActivo || 'PE1';
+    paEl.innerHTML = _periodosEdit.map(p =>
+      `<option value="${p.pe}" ${p.pe===curr?'selected':''}>${p.pe}${p.nombre?' — '+p.nombre:''}</option>`
+    ).join('');
+  }
+  if (!_periodosEdit.length) {
+    el.innerHTML = `<div class="empty-box"><div class="empty-icon">${ICONS.calendar}</div><div class="empty-txt">Sin períodos. Agrega el primero con el botón de arriba.</div></div>`;
+    return;
+  }
+  const estadoOpts = ['Pendiente','En curso','Próximo','Completado'];
+  el.innerHTML = _periodosEdit.map((p, i) => `
+    <div class="cfg-periodo-card" id="pec-${i}">
+      <div class="cfg-periodo-head">
+        <span class="cfg-periodo-pe">${esc(p.pe)}</span>
+        <input class="cfg-inp cfg-inp--periodo-nombre" value="${esc(p.nombre||'')}" placeholder="Nombre del período..."
+          oninput="updatePeriodo(${i},'nombre',this.value)">
+        <select class="cfg-inp cfg-select" onchange="updatePeriodo(${i},'estado',this.value)">
+          ${estadoOpts.map(s=>`<option value="${s}" ${p.estado===s?'selected':''}>${s}</option>`).join('')}
+        </select>
+        <button class="cfg-btn-del" onclick="deletePeriodo(${i})" title="Eliminar">✕</button>
+      </div>
+      <div class="cfg-periodo-dates">
+        ${[['inicio','Inicio'],['finTrabajo','Fin trabajo'],['entrega','Entrega scores'],['jornada','Jornada']].map(([f,l])=>`
+          <div class="cal-date-field">
+            <label class="cal-date-lbl">${l}</label>
+            <input type="text" class="cfg-inp cal-inp--date" value="${esc(p[f]||'')}" placeholder="d/m/aaaa"
+              oninput="updatePeriodo(${i},'${f}',this.value)">
+          </div>`).join('')}
+      </div>
+    </div>`).join('');
+}
+
+function updatePeriodo(idx, field, value) {
+  if (_periodosEdit[idx]) { _periodosEdit[idx][field] = value; markPeriodosDirty(); }
+}
+
+function addPeriodoRow() {
+  const n = _periodosEdit.length + 1;
+  _periodosEdit.push({ pe:`PE${n}`, nombre:'', inicio:'', finTrabajo:'', entrega:'', jornada:'', estado:'Pendiente', color:'azul' });
+  markPeriodosDirty();
+  _renderPeriodosTable();
+  setTimeout(()=>document.querySelector('#periodos-editor .cfg-periodo-card:last-child .cfg-inp--periodo-nombre')?.focus(), 80);
+}
+
+function deletePeriodo(idx) {
+  _periodosEdit.splice(idx, 1);
+  markPeriodosDirty();
+  _renderPeriodosTable();
+}
+
+function markPeriodosDirty() {
+  _periodosDirty = true;
+  document.getElementById('btn-save-periodos')?.classList.remove('hidden');
+}
+
+async function savePeriodosAdmin() {
+  const btn = document.getElementById('btn-save-periodos');
+  if (btn) { btn.textContent = 'Guardando...'; btn.classList.add('saving'); }
+  try {
+    const r = await API.savePeriodos(_periodosEdit);
+    if (!r.ok) { showToast(`Error: ${r.error||''}`, 'error'); }
+    else {
+      showToast(`✓ ${r.saved} períodos guardados`, 'ok');
+      _periodosDirty = false;
+      document.getElementById('btn-save-periodos')?.classList.add('hidden');
+      await loadData();
+      renderAll();
+    }
+  } catch(e) { showToast('Error al guardar', 'error'); console.error(e); }
+  finally {
+    if (btn) {
+      btn.innerHTML = '<svg viewBox="0 0 16 16" width="14" height="14" fill="none"><path d="M13.5 4.5L6 12 2.5 8.5" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg> Guardar períodos';
+      btn.classList.remove('saving');
+    }
+  }
+}
+
+async function setPeriodoActivo(pe) {
+  try {
+    const r = await API.saveConfig('periodoActivo', pe);
+    if (r.ok) {
+      showToast(`✓ Período activo: ${pe}`, 'ok');
+      if (D?.config) D.config.periodoActivo = pe;
+      await loadData(); renderAll();
+    } else { showToast(`Error: ${r.error||''}`, 'error'); }
+  } catch(e) { showToast('Error al guardar', 'error'); console.error(e); }
+}
+
 function initScrollEffects() {
   const topbar=document.getElementById('topbar'); let ticking=false;
   window.addEventListener('scroll',()=>{ if(!ticking){ requestAnimationFrame(()=>{ topbar?.classList.toggle('scrolled',window.scrollY>10); ticking=false; }); ticking=true; }},{passive:true});

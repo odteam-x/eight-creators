@@ -42,5 +42,9 @@ const API = (() => {
     saveRubrica:             (rubrica)                             => call('saveRubrica',           { rubrica:JSON.stringify(rubrica) }),
     saveRubricaDistritos:    (rubrica)                             => call('saveRubricaDistritos',  { rubrica:JSON.stringify(rubrica) }),
     saveUsuarios:            (usuarios)                            => call('saveUsuarios',           { usuarios:JSON.stringify(usuarios) }),
+    // Configuración dinámica / períodos
+    getConfig:               ()                                    => call('getConfig'),
+    savePeriodos:            (periodos)                            => call('savePeriodos',           { periodos:JSON.stringify(periodos) }),
+    saveConfig:              (clave, valor)                        => call('saveConfig',             { clave, valor }),
   };
 })();

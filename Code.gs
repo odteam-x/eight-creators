@@ -53,7 +53,7 @@ const DIST_COMPETENCIAS = [
 // ─────────────────────────────────────────────────────────────
 
 function doGet(e) {
-  return processRequest(e.parameter || {});
+  return processRequest((e && e.parameter) || {});
 }
 
 function doPost(e) {
@@ -86,6 +86,10 @@ function processRequest(params) {
       case 'saveRubrica':             result = saveRubricaSheet(JSON.parse(params.rubrica || '[]'));                      break;
       case 'saveRubricaDistritos':    result = saveRubricaDistritosSheet(JSON.parse(params.rubrica || '[]'));             break;
       case 'saveUsuarios':            result = saveUsuarios(JSON.parse(params.usuarios || '[]'));                         break;
+      // ── Períodos y configuración dinámica ──
+      case 'getConfig':               result = getConfigAction();                                                          break;
+      case 'savePeriodos':            result = savePeriodosAction(JSON.parse(params.periodos || '[]'));                    break;
+      case 'saveConfig':              result = saveConfigAction(params.clave, params.valor);                               break;
       default: result = { ok:false, error:'Accion desconocida: ' + action };
     }
     return jsonOut(result);
@@ -132,6 +136,8 @@ function getData() {
     rubrica:          getRubrica(ss),
     rubricaDistritos: getRubricaDistritos(ss),
     calendario:       getCalendario(ss),
+    config:           getConfig(ss),
+    periodos:         getPeriodos(ss),
     ts:               Date.now(),
   };
 }
@@ -184,6 +190,8 @@ function getSecretarioData(usuario) {
     rubrica:          getRubrica(ss),
     rubricaDistritos: u.rol === 'secretario' ? getRubricaDistritos(ss) : [],
     calendario:       getCalendario(ss),
+    config:           getConfig(ss),
+    periodos:         getPeriodos(ss),
     ts:               Date.now(),
   };
 }
@@ -351,6 +359,37 @@ function getCalendario(ss) {
   var rows = sheet.getDataRange().getValues();
   return rows.slice(1).filter(function(r){ return r[0]; }).map(function(r) {
     return { numero:String(r[0]).trim(), titulo:String(r[1]||'').trim(), color:String(r[2]||'rojo').trim().toLowerCase(), inicio:formatDate(r[3]), finTrabajo:formatDate(r[4]), entrega:formatDate(r[5]), jornada:formatDate(r[6]), estado:String(r[7]||'Pendiente').trim() };
+  });
+}
+
+// Lee CONFIG (clave/valor): A=key, B=value
+function getConfig(ss) {
+  var sheet = ss.getSheetByName('CONFIG');
+  if (!sheet) return {};
+  var rows = sheet.getDataRange().getValues();
+  var cfg = {};
+  rows.filter(function(r){ return r[0]; }).forEach(function(r) {
+    cfg[String(r[0]).trim()] = String(r[1]||'').trim();
+  });
+  return cfg;
+}
+
+// Lee PERIODOS: fila 1 encabezado, A=PE B=Nombre C=Inicio D=Fin E=Entrega F=Jornada G=Estado H=Color
+function getPeriodos(ss) {
+  var sheet = ss.getSheetByName('PERIODOS');
+  if (!sheet) return [];
+  var rows = sheet.getDataRange().getValues();
+  return rows.slice(1).filter(function(r){ return r[0]; }).map(function(r) {
+    return {
+      pe:         String(r[0]||'').trim(),
+      nombre:     String(r[1]||'').trim(),
+      inicio:     formatDate(r[2]),
+      finTrabajo: formatDate(r[3]),
+      entrega:    formatDate(r[4]),
+      jornada:    formatDate(r[5]),
+      estado:     String(r[6]||'Pendiente').trim(),
+      color:      String(r[7]||'azul').trim().toLowerCase(),
+    };
   });
 }
 
@@ -541,6 +580,56 @@ function saveRubricaDistritosSheet(rubrica) {
 }
 
 // ─────────────────────────────────────────────────────────────
+//  CONFIG / PERÍODOS — Lectura y escritura
+// ─────────────────────────────────────────────────────────────
+
+function getConfigAction() {
+  var ss = SpreadsheetApp.openById(SS_ID);
+  return { ok:true, config:getConfig(ss), periodos:getPeriodos(ss) };
+}
+
+function savePeriodosAction(periodos) {
+  if (!Array.isArray(periodos)) return { ok:false, error:'periodos debe ser un array' };
+  var ss    = SpreadsheetApp.openById(SS_ID);
+  var sheet = ss.getSheetByName('PERIODOS');
+  if (!sheet) return { ok:false, error:'Hoja PERIODOS no encontrada' };
+  var lastRow = sheet.getLastRow();
+  if (lastRow > 1) sheet.getRange(2, 1, lastRow - 1, 8).clearContent();
+  if (!periodos.length) return { ok:true, saved:0 };
+  var rows = periodos.map(function(p) {
+    return [
+      String(p.pe||'').trim(),
+      String(p.nombre||'').trim(),
+      String(p.inicio||'').trim(),
+      String(p.finTrabajo||'').trim(),
+      String(p.entrega||'').trim(),
+      String(p.jornada||'').trim(),
+      String(p.estado||'Pendiente').trim(),
+      String(p.color||'azul').trim(),
+    ];
+  });
+  sheet.getRange(2, 1, rows.length, 8).setValues(rows);
+  return { ok:true, saved:rows.length };
+}
+
+function saveConfigAction(clave, valor) {
+  if (!clave) return { ok:false, error:'Clave requerida' };
+  var ss    = SpreadsheetApp.openById(SS_ID);
+  var sheet = ss.getSheetByName('CONFIG');
+  if (!sheet) return { ok:false, error:'Hoja CONFIG no encontrada' };
+  var rows = sheet.getDataRange().getValues();
+  for (var i = 0; i < rows.length; i++) {
+    if (String(rows[i][0]).trim() === String(clave).trim()) {
+      sheet.getRange(i + 1, 2).setValue(String(valor||'').trim());
+      return { ok:true };
+    }
+  }
+  var nextRow = sheet.getLastRow() + 1;
+  sheet.getRange(nextRow, 1, 1, 2).setValues([[String(clave).trim(), String(valor||'').trim()]]);
+  return { ok:true };
+}
+
+// ─────────────────────────────────────────────────────────────
 //  ESCRITURA — Usuarios (CRUD completo)
 //  Reemplaza todas las filas de USUARIOS (fila 1 = encabezado)
 //  usuarios: [{user, pass, name, rol, distrito}]
@@ -565,4 +654,196 @@ function saveUsuarios(usuarios) {
   });
   sheet.getRange(2, 1, rows.length, 5).setValues(rows);
   return { ok:true, saved:rows.length };
+}
+
+// ═════════════════════════════════════════════════════════════════
+//  SETUP — Ejecutar UNA SOLA VEZ desde el editor para crear todas
+//  las hojas con sus encabezados y datos de ejemplo.
+//  NO sobreescribe hojas que ya tengan datos.
+// ═════════════════════════════════════════════════════════════════
+function setup() {
+  var ss  = SpreadsheetApp.openById(SS_ID);
+  var log = [];
+
+  // ── Helpers ──────────────────────────────────────────────────
+  function getOrCreate(name) {
+    var s = ss.getSheetByName(name);
+    if (!s) { s = ss.insertSheet(name); log.push('CREADA  : ' + name); }
+    else     {                           log.push('EXISTIA : ' + name); }
+    return s;
+  }
+
+  function header(sheet, row, cols, bg) {
+    bg = bg || '#002247';
+    var r = sheet.getRange(row, 1, 1, cols.length);
+    r.setValues([cols]);
+    r.setFontWeight('bold');
+    r.setBackground(bg);
+    r.setFontColor('#FFFFFF');
+  }
+
+  function isEmpty(sheet) { return sheet.getLastRow() === 0; }
+
+  // ── 1. USUARIOS ──────────────────────────────────────────────
+  var u = getOrCreate('USUARIOS');
+  if (isEmpty(u)) {
+    header(u, 1, ['usuario','contraseña','nombre','rol','distrito']);
+    u.getRange(2, 1, 3, 5).setValues([
+      ['admin',      'admin2026',  'Administrador',    'admin',      ''         ],
+      ['sec01',      'sec2026',    'Secretario Uno',   'secretario', 'NORTE'    ],
+      ['creator01',  'cr2026',     'Creator Uno',      'miembro',    'NORTE'    ],
+    ]);
+  }
+
+  // ── 2. CREATORS SCORE PE1 / PE2 / PE3 ───────────────────────
+  //   Filas 1-3 = encabezados (DATA_START_IDX = 3 → datos desde fila 4)
+  //   Columnas: A=usuario B=rol C=distrito D=nombre E=area
+  //             F=pla G=rev H=edi I=dis J=flu K=nar L=eje M=ext N=(vacío) O=estado
+  var scoreHeader = ['Usuario','Rol','Distrito','Nombre','Área',
+                     'Planificación','Revisión','Edición Creativa','Diseño Creativo',
+                     'Fluidez Oral','Narrativa / Guión','Ejecución en Redes',
+                     'Bono Ext.','','Estado'];
+  ['PE1','PE2','PE3'].forEach(function(pe) {
+    var s = getOrCreate('CREATORS SCORE - ' + pe);
+    if (isEmpty(s)) {
+      s.getRange(1,1).setValue('EIGHT CREATORS LABs — Scores');
+      s.getRange(2,1).setValue('Período: ' + pe);
+      header(s, 3, scoreHeader);
+      if (pe === 'PE1') {
+        // Fila de ejemplo (fila 4)
+        s.getRange(4, 1, 1, 15).setValues([
+          ['creator01','miembro','NORTE','Creator Uno','Video',2,3,3,2,3,2,3,0,'','Activo']
+        ]);
+      }
+    }
+  });
+
+  // ── 3. CREATORS FEEDBACK PE1 / PE2 / PE3 ────────────────────
+  //   Misma estructura de filas que SCORE
+  var fbHeader = ['Usuario','Rol','Distrito','Nombre','Área',
+                  'Planificación','Revisión','Edición Creativa','Diseño Creativo',
+                  'Fluidez Oral','Narrativa / Guión','Ejecución en Redes','Bono Ext.'];
+  ['PE1','PE2','PE3'].forEach(function(pe) {
+    var s = getOrCreate('CREATORS FEEDBACK - ' + pe);
+    if (isEmpty(s)) {
+      s.getRange(1,1).setValue('EIGHT CREATORS LABs — Feedback');
+      s.getRange(2,1).setValue('Período: ' + pe);
+      header(s, 3, fbHeader, '#003070');
+      if (pe === 'PE1') {
+        s.getRange(4, 1, 1, 13).setValues([
+          ['creator01','miembro','NORTE','Creator Uno','Video','','','','','','','','']
+        ]);
+      }
+    }
+  });
+
+  // ── 4. CREATORS DISTRITOS PE1 / PE2 / PE3 ───────────────────
+  //   Fila 1 = encabezado, datos desde fila 2
+  //   A=Distrito B=CGO C=CCT D=COM E=CEE F=Total
+  ['PE1','PE2','PE3'].forEach(function(pe) {
+    var s = getOrCreate('CREATORS DISTRITOS - ' + pe);
+    if (isEmpty(s)) {
+      header(s, 1, ['Distrito','CGO','CCT','COM','CEE','Total'], '#003A82');
+      if (pe === 'PE1') {
+        s.getRange(2, 1, 2, 6).setValues([
+          ['NORTE', 5, 6, 4, 5, 20],
+          ['SUR',   4, 4, 5, 4, 17],
+        ]);
+      }
+    }
+  });
+
+  // ── 5. CRITERIOS ─────────────────────────────────────────────
+  //   Sin encabezado. A=key B=label C=abbr D=color
+  var crit = getOrCreate('CRITERIOS');
+  if (isEmpty(crit)) {
+    crit.getRange(1, 1, 7, 4).setValues([
+      ['pla','Planificación',      'PLA','#E05A6A'],
+      ['rev','Revisión',           'REV','#38BDF8'],
+      ['edi','Edición Creativa',   'EDI','#2ECC71'],
+      ['dis','Diseño Creativo',    'DIS','#5B7FFF'],
+      ['flu','Fluidez Oral',       'FLU','#C084FC'],
+      ['nar','Narrativa / Guión',  'NAR','#F0C040'],
+      ['eje','Ejecución en Redes', 'EJE','#FB923C'],
+    ]);
+  }
+
+  // ── 6. TABLA DE PUNTUACIÓN (rúbrica creators) ────────────────
+  //   Col A vacía, B=criterio, C=nivel4, D=nivel3, E=nivel2, F=nivel1
+  var rub = getOrCreate('TABLA DE PUNTUACIÓN');
+  if (isEmpty(rub)) {
+    header(rub, 1, ['','Criterio','Nivel 4 — Excelente','Nivel 3 — Bueno','Nivel 2 — En Proceso','Nivel 1 — Bajo']);
+    rub.getRange(2, 1, 7, 6).setValues([
+      ['','Planificación',      'Organiza con anticipación y detalle completo',   'Planifica la mayoría del contenido',      'Planificación básica o incompleta',    'Sin planificación'],
+      ['','Revisión',           'Revisión exhaustiva, cero errores publicados',   'Revisión adecuada con errores mínimos',   'Revisión superficial',                'Sin revisión del contenido'],
+      ['','Edición Creativa',   'Edición profesional, creativa y original',       'Buena edición con detalles menores',      'Edición básica, genérica',             'Edición mínima o sin editar'],
+      ['','Diseño Creativo',    'Diseño original, atractivo y coherente',         'Buen diseño con cohesión visual',         'Diseño genérico o inconsistente',      'Sin diseño o muy básico'],
+      ['','Fluidez Oral',       'Comunicación fluida, natural y carismática',     'Buena fluidez con pausas ocasionales',    'Fluidez limitada, pausas frecuentes',  'Comunicación entrecortada'],
+      ['','Narrativa / Guión',  'Guión estructurado, atractivo y memorable',      'Buena narrativa con estructura clara',    'Narrativa básica, poca estructura',    'Sin estructura narrativa'],
+      ['','Ejecución en Redes', 'Publicación óptima, consistente y estratégica',  'Buena ejecución con detalles a mejorar', 'Ejecución irregular o inconsistente',  'Ejecución deficiente'],
+    ]);
+  }
+
+  // ── 7. TABLA DE PUNTUACIÓN Distritos ────────────────────────
+  var rubD = getOrCreate('TABLA DE PUNTUACIÓN Distritos');
+  if (isEmpty(rubD)) {
+    header(rubD, 1, ['','Criterio','Nivel 7-6 — Excelente','Nivel 5-4 — Bueno','Nivel 3-2 — En Proceso','Nivel 1-0 — Bajo']);
+    rubD.getRange(2, 1, 4, 6).setValues([
+      ['','Gestión y Organización "CGO"',   'Gestión eficiente, organizada y anticipada',  'Buena gestión con áreas de mejora',   'Gestión básica e inconsistente',     'Gestión deficiente o ausente'],
+      ['','Creativa y Técnica "CCT"',       'Alta calidad creativa y técnica constante',   'Buena calidad con detalles a mejorar','Calidad básica con errores frecuentes','Calidad deficiente'],
+      ['','Comunicativa "COM"',             'Comunicación excelente y muy efectiva',       'Buena comunicación con mejoras menores','Comunicación limitada o irregular',  'Comunicación deficiente'],
+      ['','Ejecución Estratégica "CEE"',    'Ejecución estratégica excelente y puntual',  'Buena ejecución con ajustes menores', 'Ejecución básica, incompleta',       'Ejecución deficiente o ausente'],
+    ]);
+  }
+
+  // ── 8. Calendario ────────────────────────────────────────────
+  //   Fila 1 = encabezado, datos desde fila 2
+  //   A=numero B=titulo C=color D=inicio E=finTrabajo F=entrega G=jornada H=estado
+  var cal = getOrCreate('Calendario');
+  if (isEmpty(cal)) {
+    header(cal, 1, ['Número','Título','Color','Inicio','Fin de Trabajo','Entrega Scores','Jornada','Estado']);
+    cal.getRange(2, 1, 3, 8).setValues([
+      [1,'Período de Evaluación 1','azul',  '1/1/2026', '31/1/2026','5/2/2026', '10/2/2026','Completado'],
+      [2,'Período de Evaluación 2','rojo',  '1/3/2026', '31/3/2026','5/4/2026', '10/4/2026','En curso' ],
+      [3,'Período de Evaluación 3','verde', '1/5/2026', '31/5/2026','5/6/2026', '10/6/2026','Pendiente'],
+    ]);
+  }
+
+  // ── 9. CONFIG ─────────────────────────────────────────────────
+  //   A=clave B=valor (sin encabezado — lo lee como datos directos)
+  var cfg = getOrCreate('CONFIG');
+  if (isEmpty(cfg)) {
+    cfg.getRange(1, 1, 3, 2).setValues([
+      ['periodoActivo', 'PE1'      ],
+      ['autoRefreshMs', '300000'   ],
+      ['sitioNombre',   'EIGHT CREATORS LABs'],
+    ]);
+  }
+
+  // ── 10. PERIODOS ─────────────────────────────────────────────
+  //   Fila 1 = encabezado, datos desde fila 2
+  //   A=PE B=Nombre C=Inicio D=FinTrabajo E=Entrega F=Jornada G=Estado H=Color
+  var per = getOrCreate('PERIODOS');
+  if (isEmpty(per)) {
+    header(per, 1, ['PE','Nombre','Inicio','Fin de trabajo','Entrega scores','Jornada','Estado','Color']);
+    per.getRange(2, 1, 3, 8).setValues([
+      ['PE1','Primer Período', '1/1/2026', '31/1/2026','5/2/2026', '10/2/2026','Completado','azul' ],
+      ['PE2','Segundo Período','1/3/2026', '31/3/2026','5/4/2026', '10/4/2026','En curso',  'rojo' ],
+      ['PE3','Tercer Período', '1/5/2026', '31/5/2026','5/6/2026', '10/6/2026','Pendiente', 'verde'],
+    ]);
+  }
+
+  // ── Log final ─────────────────────────────────────────────────
+  Logger.log('════════════════════════════════════════════');
+  Logger.log('  EIGHT CREATORS LABs — Setup completado');
+  Logger.log('════════════════════════════════════════════');
+  log.forEach(function(l) { Logger.log(l); });
+  Logger.log('────────────────────────────────────────────');
+  Logger.log('Usuarios de prueba creados:');
+  Logger.log('  admin     / admin2026  → Panel de Admin');
+  Logger.log('  sec01     / sec2026   → Panel Secretario');
+  Logger.log('  creator01 / cr2026    → Vista Miembro');
+  Logger.log('────────────────────────────────────────────');
+  Logger.log('Próximo paso: Implementar → Nueva implementación → Web App');
+  Logger.log('════════════════════════════════════════════');
 }
